@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Foto, Pessoa } from '@/types'
 import { aplicarMarcaDagua } from '@/lib/watermark'
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, User } from 'lucide-react'
+import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, User, Clock, Mail } from 'lucide-react'
 
 interface Props {
   onVoltar: () => void
@@ -20,7 +20,7 @@ export default function AreaAdmin({ onVoltar }: Props) {
   const [novoNome, setNovoNome] = useState('')
   const [novoTurma, setNovoTurma] = useState('')
   const [novoDescricao, setNovoDescricao] = useState('')
-  const [novoPreco, setNovoPreco] = useState('5.00')
+  const [novoPreco, setNovoPreco] = useState('5,00')
   const [criando, setCriando] = useState(false)
 
   const [titulo, setTitulo] = useState('')
@@ -37,19 +37,63 @@ export default function AreaAdmin({ onVoltar }: Props) {
 
   const [mostrarConfig, setMostrarConfig] = useState(false)
   const [chavePix, setChavePix] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
 
   useEffect(() => {
     const configSalva = localStorage.getItem('clickefotos-config')
     if (configSalva) {
-      const config = JSON.parse(configSalva)
-      setChavePix(config.chavePix || '')
+      try {
+        const config = JSON.parse(configSalva)
+        setChavePix(config.chavePix || '')
+        setWhatsapp(config.whatsapp || '')
+      } catch {}
     }
   }, [])
 
   function salvarConfig() {
-    localStorage.setItem('clickefotos-config', JSON.stringify({ chavePix }))
+    localStorage.setItem('clickefotos-config', JSON.stringify({ chavePix, whatsapp }))
     setMostrarConfig(false)
     alert('Configurações salvas!')
+  }
+
+  const [mostrarPendentes, setMostrarPendentes] = useState(false)
+  const [comprasPendentes, setComprasPendentes] = useState<any[]>([])
+
+  async function carregarComprasPendentes() {
+    const { data } = await supabase
+      .from('compras')
+      .select('*, foto:fotos(titulo, pessoa_id)')
+      .eq('status', 'pendente')
+      .order('created_at', { ascending: false })
+
+    setComprasPendentes(data || [])
+  }
+
+  async function liberarCompra(compra: any) {
+    // Marca a compra como paga
+    await supabase
+      .from('compras')
+      .update({ status: 'pago' })
+      .eq('id', compra.id)
+
+    // Marca a foto como vendida
+    await supabase
+      .from('fotos')
+      .update({ vendida: true })
+      .eq('id', compra.foto_id)
+
+    // Recarrega
+    await carregarComprasPendentes()
+    alert(`✅ Foto liberada para ${compra.cliente_nome} (${compra.cliente_email})`)
+  }
+
+  async function rejeitarCompra(compra: any) {
+    if (!confirm(`Rejeitar compra de ${compra.cliente_nome}?`)) return
+    await supabase
+      .from('compras')
+      .delete()
+      .eq('id', compra.id)
+    await carregarComprasPendentes()
   }
 
   async function carregarPessoas() {
@@ -247,6 +291,16 @@ export default function AreaAdmin({ onVoltar }: Props) {
               </div>
               <span className="font-bold">Painel do Organizador</span>
               <button
+                onClick={async () => {
+                  await carregarComprasPendentes()
+                  setMostrarPendentes(true)
+                }}
+                className="px-3 py-1.5 rounded-lg glass text-xs hover:bg-white/[0.08] flex items-center gap-1"
+              >
+                <Clock className="w-3 h-3" />
+                Pendentes
+              </button>
+              <button
                 onClick={() => setMostrarConfig(true)}
                 className="px-3 py-1.5 rounded-lg glass text-xs hover:bg-white/[0.08]"
               >
@@ -392,6 +446,74 @@ export default function AreaAdmin({ onVoltar }: Props) {
           </div>
         )}
 
+        {mostrarPendentes && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            onClick={() => setMostrarPendentes(false)}
+          >
+            <div
+              className="glass-strong rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-yellow-400" />
+                  Compras pendentes
+                </h3>
+                <button onClick={() => setMostrarPendentes(false)} className="w-8 h-8 rounded-full glass flex items-center justify-center">
+                  <span className="text-xl">×</span>
+                </button>
+              </div>
+
+              {comprasPendentes.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-5xl mb-3 opacity-50">✅</div>
+                  <p className="text-white/60">Nenhuma compra pendente</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {comprasPendentes.map(compra => (
+                    <div key={compra.id} className="glass rounded-xl p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold">{compra.cliente_nome}</div>
+                          <div className="flex items-center gap-1 text-xs text-white/50 mt-1">
+                            <Mail className="w-3 h-3" />
+                            {compra.cliente_email}
+                          </div>
+                          <div className="text-sm text-white/70 mt-2">
+                            📷 {compra.foto?.titulo || 'Foto'}
+                          </div>
+                          <div className="text-lg font-bold text-green-400 mt-1">
+                            R$ {compra.valor_pago?.toFixed(2).replace('.', ',')}
+                          </div>
+                          <div className="text-xs text-white/40 mt-1">
+                            {new Date(compra.created_at).toLocaleString('pt-BR')}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => liberarCompra(compra)}
+                            className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-semibold whitespace-nowrap"
+                          >
+                            ✓ Liberar
+                          </button>
+                          <button
+                            onClick={() => rejeitarCompra(compra)}
+                            className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-sm font-semibold whitespace-nowrap"
+                          >
+                            ✗ Rejeitar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {mostrarConfig && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
@@ -420,6 +542,22 @@ export default function AreaAdmin({ onVoltar }: Props) {
                   />
                   <p className="text-xs text-white/40 mt-2">
                     Pode ser: email, CPF/CNPJ, telefone ou chave aleatória
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
+                    WhatsApp para comprovante
+                  </label>
+                  <input
+                    type="text"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    placeholder="(11) 99999-9999"
+                    className="w-full px-4 py-3 rounded-xl"
+                  />
+                  <p className="text-xs text-white/40 mt-2">
+                    Onde os clientes enviarão os comprovantes
                   </p>
                 </div>
 

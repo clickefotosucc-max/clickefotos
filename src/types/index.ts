@@ -1,9 +1,8 @@
-export interface Estande {
+export interface Pessoa {
   id: string
   codigo: string
   nome: string
   descricao: string | null
-  responsavel: string
   turma: string | null
   preco_por_foto: number
   created_at: string
@@ -11,7 +10,7 @@ export interface Estande {
 
 export interface Foto {
   id: string
-  estande_id: string
+  pessoa_id: string
   titulo: string
   descricao: string | null
   url: string

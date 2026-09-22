@@ -2,23 +2,22 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Foto, Estande } from '@/types'
-import { ArrowLeft, Download, Heart, Lock, Check, X } from 'lucide-react'
+import type { Foto, Pessoa } from '@/types'
+import { ArrowLeft, Download, Lock, Check, X } from 'lucide-react'
 
 interface Props {
-  estande: Estande
+  pessoa: Pessoa
   fotos: Foto[]
   onVoltar: () => void
 }
 
-export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }: Props) {
+export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: Props) {
   const [fotos, setFotos] = useState<Foto[]>(fotosIniciais)
   const [fotoSelecionada, setFotoSelecionada] = useState<Foto | null>(null)
   const [comprando, setComprando] = useState(false)
   const [step, setStep] = useState<'ver' | 'comprar' | 'pago' | 'baixar'>('ver')
   const [email, setEmail] = useState('')
   const [nome, setNome] = useState('')
-  const [tokenDownload, setTokenDownload] = useState<string>('')
   const [downloadsUsados, setDownloadsUsados] = useState(0)
 
   async function iniciarCompra(foto: Foto) {
@@ -34,23 +33,16 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
 
     setComprando(true)
 
-    // Em produção: integração com Stripe/MercadoPago aqui
-    // Para MVP: simulamos o pagamento aprovado
-
     const downloadToken = `${Date.now()}-${Math.random().toString(36).substring(7)}`
 
-    const { data, error } = await supabase
-      .from('compras')
-      .insert([{
-        foto_id: fotoSelecionada.id,
-        cliente_email: email,
-        cliente_nome: nome,
-        valor_pago: estande.preco_por_foto,
-        status: 'pago',
-        download_token: downloadToken,
-      }])
-      .select()
-      .single()
+    const { error } = await supabase.from('compras').insert([{
+      foto_id: fotoSelecionada.id,
+      cliente_email: email,
+      cliente_nome: nome,
+      valor_pago: pessoa.preco_por_foto,
+      status: 'pago',
+      download_token: downloadToken,
+    }])
 
     if (error) {
       alert('Erro ao processar compra: ' + error.message)
@@ -58,17 +50,14 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
       return
     }
 
-    // Marcar foto como vendida
     await supabase
       .from('fotos')
       .update({ vendida: true })
       .eq('id', fotoSelecionada.id)
 
-    setTokenDownload(downloadToken)
     setStep('pago')
     setComprando(false)
 
-    // Atualizar lista
     setFotos(fotos.map(f =>
       f.id === fotoSelecionada.id ? { ...f, vendida: true } : f
     ))
@@ -84,7 +73,6 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
     setDownloadsUsados(downloadsUsados + 1)
     setStep('baixar')
 
-    // Trigger download
     const link = document.createElement('a')
     link.href = fotoSelecionada.url_hd
     link.download = `clickefotos-${fotoSelecionada.titulo}.jpg`
@@ -96,7 +84,6 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
 
   return (
     <div className="min-h-screen text-white">
-      {/* Header com dados do estande */}
       <nav className="sticky top-0 z-50 glass border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <button
@@ -107,10 +94,10 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
             Sair
           </button>
           <div className="text-center flex-1">
-            <h2 className="font-bold text-lg">{estande.nome}</h2>
+            <h2 className="font-bold text-lg">{pessoa.nome}</h2>
             <p className="text-xs text-white/50">
-              Código: <span className="font-mono font-semibold">{estande.codigo}</span>
-              {estande.turma && ` • ${estande.turma}`}
+              Código: <span className="font-mono font-semibold">{pessoa.codigo}</span>
+              {pessoa.turma && ` • ${pessoa.turma}`}
             </p>
           </div>
           <div className="w-16"></div>
@@ -118,30 +105,25 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
-        {/* Cabeçalho do estande */}
         <section className="text-center mb-12 animate-fade-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-xs font-medium mb-4">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
             {fotos.length} {fotos.length === 1 ? 'foto' : 'fotos'} encontradas
           </div>
           <h1 className="text-4xl md:text-5xl font-black mb-3">
-            <span className="gradient-text">{estande.nome}</span>
+            Olá, <span className="gradient-text">{pessoa.nome}</span>
           </h1>
-          {estande.descricao && (
-            <p className="text-white/60 max-w-xl mx-auto">{estande.descricao}</p>
+          {pessoa.descricao && (
+            <p className="text-white/60 max-w-xl mx-auto">{pessoa.descricao}</p>
           )}
-          <p className="text-sm text-white/40 mt-4">
-            Por <span className="text-white/70 font-semibold">{estande.responsavel}</span>
-          </p>
         </section>
 
-        {/* Galeria */}
         {fotos.length === 0 ? (
           <div className="text-center py-24 glass-strong rounded-3xl">
             <div className="text-7xl mb-4 opacity-50">📷</div>
             <h3 className="text-xl font-semibold mb-2">Nenhuma foto ainda</h3>
             <p className="text-white/50">
-              As fotos do seu estande aparecerão aqui em breve.
+              Suas fotos aparecerão aqui em breve.
             </p>
           </div>
         ) : (
@@ -152,7 +134,6 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
                 className="photo-card glass-strong rounded-3xl overflow-hidden animate-fade-up"
                 style={{ animationDelay: `${idx * 0.05}s` }}
               >
-                {/* Imagem com marca d'água */}
                 <div className="relative aspect-[4/3] overflow-hidden bg-black/20 group cursor-pointer"
                   onClick={() => setFotoSelecionada(foto)}>
                   <img
@@ -160,7 +141,6 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
                     alt={foto.titulo}
                     className="photo-image w-full h-full object-cover"
                   />
-                  {/* Marca d'água */}
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                     <div className="text-white/40 text-2xl md:text-3xl font-black tracking-widest rotate-[-30deg] select-none">
                       CLICKEFOTOS
@@ -199,7 +179,7 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
                         className="btn-primary w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
                       >
                         <Lock className="w-4 h-4" />
-                        Comprar HD • R$ {estande.preco_por_foto.toFixed(2)}
+                        Comprar HD • R$ {pessoa.preco_por_foto.toFixed(2)}
                       </button>
                     )}
                   </div>
@@ -210,7 +190,6 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
         )}
       </main>
 
-      {/* Modal de Compra */}
       {fotoSelecionada && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-up"
@@ -247,7 +226,7 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
                 <>
                   <h3 className="text-xl font-bold mb-2">Comprar foto em HD</h3>
                   <p className="text-sm text-white/60 mb-6">
-                    {fotoSelecionada.titulo} • R$ {estande.preco_por_foto.toFixed(2)}
+                    {fotoSelecionada.titulo} • R$ {pessoa.preco_por_foto.toFixed(2)}
                   </p>
 
                   <div className="space-y-4">
@@ -291,7 +270,7 @@ export default function AreaCliente({ estande, fotos: fotosIniciais, onVoltar }:
                       disabled={comprando || !email || !nome}
                       className="btn-primary w-full py-4 rounded-xl font-semibold disabled:opacity-50"
                     >
-                      {comprando ? 'Processando...' : `Pagar R$ ${estande.preco_por_foto.toFixed(2)}`}
+                      {comprando ? 'Processando...' : `Pagar R$ ${pessoa.preco_por_foto.toFixed(2)}`}
                     </button>
                   </div>
                 </>

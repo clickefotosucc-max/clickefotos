@@ -2,29 +2,26 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Foto, Estande } from '@/types'
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, Image as ImageIcon } from 'lucide-react'
+import type { Foto, Pessoa } from '@/types'
+import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, User } from 'lucide-react'
 
 interface Props {
   onVoltar: () => void
 }
 
 export default function AreaAdmin({ onVoltar }: Props) {
-  const [estandes, setEstandes] = useState<Estande[]>([])
-  const [estandeSelecionado, setEstandeSelecionado] = useState<Estande | null>(null)
-  const [fotosEstande, setFotosEstande] = useState<Foto[]>([])
+  const [pessoas, setPessoas] = useState<Pessoa[]>([])
+  const [pessoaSelecionada, setPessoaSelecionada] = useState<Pessoa | null>(null)
+  const [fotosPessoa, setFotosPessoa] = useState<Foto[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Form de novo estande
-  const [showNovoEstande, setShowNovoEstande] = useState(false)
+  const [showNovaPessoa, setShowNovaPessoa] = useState(false)
   const [novoNome, setNovoNome] = useState('')
-  const [novoResponsavel, setNovoResponsavel] = useState('')
   const [novoTurma, setNovoTurma] = useState('')
   const [novoDescricao, setNovoDescricao] = useState('')
   const [novoPreco, setNovoPreco] = useState('5.00')
   const [criando, setCriando] = useState(false)
 
-  // Form de nova foto
   const [titulo, setTitulo] = useState('')
   const [descricao, setDescricao] = useState('')
   const [arquivo, setArquivo] = useState<File | null>(null)
@@ -36,63 +33,70 @@ export default function AreaAdmin({ onVoltar }: Props) {
   const [codigoCopiado, setCodigoCopiado] = useState(false)
 
   useEffect(() => {
-    carregarEstandes()
+    carregarPessoas()
   }, [])
 
-  async function carregarEstandes() {
+  async function carregarPessoas() {
     const { data, error } = await supabase
-      .from('estandes')
+      .from('pessoas')
       .select('*')
       .order('created_at', { ascending: false })
 
     if (!error && data) {
-      setEstandes(data)
+      setPessoas(data)
     }
     setLoading(false)
   }
 
-  async function carregarFotosEstande(estande: Estande) {
-    setEstandeSelecionado(estande)
+  async function carregarFotosPessoa(pessoa: Pessoa) {
+    setPessoaSelecionada(pessoa)
     const { data, error } = await supabase
       .from('fotos')
       .select('*')
-      .eq('estande_id', estande.id)
+      .eq('pessoa_id', pessoa.id)
       .order('created_at', { ascending: false })
 
     if (!error && data) {
-      setFotosEstande(data)
+      setFotosPessoa(data)
     }
   }
 
-  async function criarEstande(e: React.FormEvent) {
+  async function criarPessoa(e: React.FormEvent) {
     e.preventDefault()
-    if (!novoNome || !novoResponsavel) {
-      alert('Preencha nome e responsável')
+    if (!novoNome) {
+      alert('Preencha o nome')
       return
     }
 
     setCriando(true)
 
     // Gerar código único
-    const { data: codigoData, error: codigoError } = await supabase
-      .rpc('gerar_codigo_estande')
+    let codigo = ''
+    for (let i = 0; i < 10; i++) {
+      const tentativa = Math.random().toString(36).substring(2, 5).toUpperCase() + '-' +
+                       Math.random().toString(36).substring(2, 5).toUpperCase()
 
-    if (codigoError) {
-      // Fallback: gerar manualmente
-      const codigoManual = Math.random().toString(36).substring(2, 5).toUpperCase() + '-' +
-                          Math.random().toString(36).substring(2, 5).toUpperCase()
-      await criarEstandeComCodigo(codigoManual)
+      const { data: existe } = await supabase
+        .from('pessoas')
+        .select('id')
+        .eq('codigo', tentativa)
+        .single()
+
+      if (!existe) {
+        codigo = tentativa
+        break
+      }
+    }
+
+    if (!codigo) {
+      alert('Não foi possível gerar código único')
+      setCriando(false)
       return
     }
 
-    await criarEstandeComCodigo(codigoData)
-  }
-
-  async function criarEstandeComCodigo(codigo: string) {
-    const { error } = await supabase.from('estandes').insert([{
+    const { error } = await supabase.from('pessoas').insert([{
       codigo,
       nome: novoNome,
-      responsavel: novoResponsavel,
       turma: novoTurma || null,
       descricao: novoDescricao || null,
       preco_por_foto: parseFloat(novoPreco),
@@ -101,17 +105,16 @@ export default function AreaAdmin({ onVoltar }: Props) {
     setCriando(false)
 
     if (error) {
-      alert('Erro ao criar estande: ' + error.message)
+      alert('Erro ao criar pessoa: ' + error.message)
       return
     }
 
-    setShowNovoEstande(false)
+    setShowNovaPessoa(false)
     setNovoNome('')
-    setNovoResponsavel('')
     setNovoTurma('')
     setNovoDescricao('')
     setNovoPreco('5.00')
-    await carregarEstandes()
+    await carregarPessoas()
   }
 
   function handleFile(file: File | null) {
@@ -126,15 +129,14 @@ export default function AreaAdmin({ onVoltar }: Props) {
 
   async function handleUploadFoto(e: React.FormEvent) {
     e.preventDefault()
-    if (!estandeSelecionado || !arquivo || !titulo) {
+    if (!pessoaSelecionada || !arquivo || !titulo) {
       alert('Preencha título e selecione uma imagem')
       return
     }
 
     setUploading(true)
 
-    // Upload da foto padrão (preview)
-    const nomeBase = `${estandeSelecionado.codigo}-${Date.now()}`
+    const nomeBase = `${pessoaSelecionada.codigo}-${Date.now()}`
     const { error: uploadError } = await supabase.storage
       .from('fotos')
       .upload(`${nomeBase}-preview`, arquivo)
@@ -149,36 +151,22 @@ export default function AreaAdmin({ onVoltar }: Props) {
       .from('fotos')
       .getPublicUrl(`${nomeBase}-preview`)
 
-    // Upload da versão HD (opcional)
     let urlHD = urlData.publicUrl
-    if (arquivoHD) {
-      const { error: uploadHDError } = await supabase.storage
-        .from('fotos-hd')
-        .upload(`${nomeBase}-hd`, arquivoHD)
+    const arquivoHDFinal = arquivoHD || arquivo
 
-      if (!uploadHDError) {
-        const { data: urlHDData } = supabase.storage
-          .from('fotos-hd')
-          .getPublicUrl(`${nomeBase}-hd`)
-        urlHD = urlHDData.publicUrl
-      }
-    } else {
-      // Se não forneceu HD, usa a mesma imagem
-      const { error: copyError } = await supabase.storage
-        .from('fotos-hd')
-        .upload(`${nomeBase}-hd`, arquivo)
+    const { error: uploadHDError } = await supabase.storage
+      .from('fotos-hd')
+      .upload(`${nomeBase}-hd`, arquivoHDFinal)
 
-      if (!copyError) {
-        const { data: urlHDData } = supabase.storage
-          .from('fotos-hd')
-          .getPublicUrl(`${nomeBase}-hd`)
-        urlHD = urlHDData.publicUrl
-      }
+    if (!uploadHDError) {
+      const { data: urlHDData } = supabase.storage
+        .from('fotos-hd')
+        .getPublicUrl(`${nomeBase}-hd`)
+      urlHD = urlHDData.publicUrl
     }
 
-    // Salvar no banco
     const { error: insertError } = await supabase.from('fotos').insert([{
-      estande_id: estandeSelecionado.id,
+      pessoa_id: pessoaSelecionada.id,
       titulo,
       descricao: descricao || null,
       url: urlData.publicUrl,
@@ -200,16 +188,13 @@ export default function AreaAdmin({ onVoltar }: Props) {
     if (fileInputRef.current) fileInputRef.current.value = ''
     if (fileInputHDRef.current) fileInputHDRef.current.value = ''
 
-    await carregarFotosEstande(estandeSelecionado)
+    await carregarFotosPessoa(pessoaSelecionada)
   }
 
   async function deletarFoto(foto: Foto) {
-    if (!confirm('Tem certeza que deseja deletar esta foto?')) return
-
+    if (!confirm('Deletar esta foto?')) return
     await supabase.from('fotos').delete().eq('id', foto.id)
-    if (estandeSelecionado) {
-      await carregarFotosEstande(estandeSelecionado)
-    }
+    if (pessoaSelecionada) await carregarFotosPessoa(pessoaSelecionada)
   }
 
   function copiarCodigo(codigo: string) {
@@ -218,10 +203,8 @@ export default function AreaAdmin({ onVoltar }: Props) {
     setTimeout(() => setCodigoCopiado(false), 2000)
   }
 
-  // ============================================
-  // VIEW: Lista de estandes
-  // ============================================
-  if (!estandeSelecionado) {
+  // VIEW: Lista de pessoas
+  if (!pessoaSelecionada) {
     return (
       <div className="min-h-screen text-white">
         <nav className="sticky top-0 z-50 glass border-b border-white/5">
@@ -232,7 +215,7 @@ export default function AreaAdmin({ onVoltar }: Props) {
             </button>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
-                <ImageIcon className="w-4 h-4" />
+                <User className="w-4 h-4" />
               </div>
               <span className="font-bold">Painel do Organizador</span>
             </div>
@@ -243,17 +226,17 @@ export default function AreaAdmin({ onVoltar }: Props) {
         <main className="max-w-7xl mx-auto px-6 py-12">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold">Estandes cadastrados</h1>
+              <h1 className="text-3xl font-bold">Pessoas cadastradas</h1>
               <p className="text-white/50 text-sm mt-1">
-                {estandes.length} {estandes.length === 1 ? 'estande' : 'estandes'} • {estandes.reduce((acc, e) => acc + 1, 0)} ativos
+                {pessoas.length} {pessoas.length === 1 ? 'pessoa' : 'pessoas'} cadastradas
               </p>
             </div>
             <button
-              onClick={() => setShowNovoEstande(true)}
+              onClick={() => setShowNovaPessoa(true)}
               className="btn-primary px-5 py-3 rounded-xl font-semibold text-sm flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
-              Novo estande
+              Nova pessoa
             </button>
           </div>
 
@@ -261,46 +244,48 @@ export default function AreaAdmin({ onVoltar }: Props) {
             <div className="text-center py-20">
               <div className="inline-block w-10 h-10 border-4 border-violet-500/30 border-t-violet-500 rounded-full animate-spin"></div>
             </div>
-          ) : estandes.length === 0 ? (
+          ) : pessoas.length === 0 ? (
             <div className="text-center py-20 glass-strong rounded-3xl">
-              <div className="text-6xl mb-4">🏪</div>
-              <h3 className="text-xl font-bold mb-2">Nenhum estande ainda</h3>
-              <p className="text-white/50 mb-6">Comece criando o primeiro estande da feira</p>
+              <div className="text-6xl mb-4">👤</div>
+              <h3 className="text-xl font-bold mb-2">Nenhuma pessoa ainda</h3>
+              <p className="text-white/50 mb-6">Comece cadastrando a primeira pessoa</p>
               <button
-                onClick={() => setShowNovoEstande(true)}
+                onClick={() => setShowNovaPessoa(true)}
                 className="btn-primary px-6 py-3 rounded-xl font-semibold"
               >
-                Criar primeiro estande
+                Cadastrar primeira pessoa
               </button>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {estandes.map((estande) => (
+              {pessoas.map((pessoa) => (
                 <button
-                  key={estande.id}
-                  onClick={() => carregarFotosEstande(estande)}
+                  key={pessoa.id}
+                  onClick={() => carregarFotosPessoa(pessoa)}
                   className="glass-strong rounded-2xl p-6 text-left hover:bg-white/[0.08] transition-all group"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-xl">
-                      🏪
+                      👤
                     </div>
                     <div
                       onClick={(e) => {
                         e.stopPropagation()
-                        copiarCodigo(estande.codigo)
+                        copiarCodigo(pessoa.codigo)
                       }}
                       className="flex items-center gap-1 px-2 py-1 rounded-md glass text-xs font-mono cursor-pointer hover:bg-white/[0.08]"
                     >
-                      {estande.codigo}
+                      {pessoa.codigo}
                       {codigoCopiado ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
                     </div>
                   </div>
-                  <h3 className="font-bold text-lg leading-tight">{estande.nome}</h3>
-                  <p className="text-sm text-white/50 mt-1">@{estande.responsavel}</p>
-                  {estande.turma && <p className="text-xs text-white/40 mt-1">{estande.turma}</p>}
+                  <h3 className="font-bold text-lg leading-tight">{pessoa.nome}</h3>
+                  {pessoa.turma && <p className="text-sm text-white/50 mt-1">{pessoa.turma}</p>}
+                  {pessoa.descricao && (
+                    <p className="text-xs text-white/40 mt-2 line-clamp-2">{pessoa.descricao}</p>
+                  )}
                   <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-xs">
-                    <span className="text-white/40">R$ {estande.preco_por_foto.toFixed(2)} / foto</span>
+                    <span className="text-white/40">R$ {pessoa.preco_por_foto.toFixed(2)} / foto</span>
                     <span className="text-violet-400 group-hover:translate-x-1 transition-transform">Ver fotos →</span>
                   </div>
                 </button>
@@ -309,30 +294,22 @@ export default function AreaAdmin({ onVoltar }: Props) {
           )}
         </main>
 
-        {/* Modal: Novo Estande */}
-        {showNovoEstande && (
+        {showNovaPessoa && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-            onClick={() => setShowNovoEstande(false)}>
+            onClick={() => setShowNovaPessoa(false)}>
             <div className="glass-strong rounded-3xl max-w-lg w-full p-8" onClick={(e) => e.stopPropagation()}>
-              <h2 className="text-2xl font-bold mb-2">Novo estande</h2>
+              <h2 className="text-2xl font-bold mb-2">Nova pessoa</h2>
               <p className="text-sm text-white/50 mb-6">
-                Um código único será gerado automaticamente para os clientes acessarem as fotos
+                Um código único será gerado automaticamente
               </p>
 
-              <form onSubmit={criarEstande} className="space-y-4">
+              <form onSubmit={criarPessoa} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    Nome do estande *
+                    Nome completo *
                   </label>
                   <input type="text" value={novoNome} onChange={(e) => setNovoNome(e.target.value)}
-                    placeholder="Ex: EcoTech" className="w-full px-4 py-3 rounded-xl" required />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    Responsável *
-                  </label>
-                  <input type="text" value={novoResponsavel} onChange={(e) => setNovoResponsavel(e.target.value)}
-                    placeholder="Ex: João Silva" className="w-full px-4 py-3 rounded-xl" required />
+                    placeholder="Ex: Fulano de Tal" className="w-full px-4 py-3 rounded-xl" required />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
@@ -343,10 +320,10 @@ export default function AreaAdmin({ onVoltar }: Props) {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    Descrição
+                    Descrição (opcional)
                   </label>
                   <input type="text" value={novoDescricao} onChange={(e) => setNovoDescricao(e.target.value)}
-                    placeholder="Sobre o que é o estande..." className="w-full px-4 py-3 rounded-xl" />
+                    placeholder="Ex: Participante da feira" className="w-full px-4 py-3 rounded-xl" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
@@ -357,13 +334,13 @@ export default function AreaAdmin({ onVoltar }: Props) {
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={() => setShowNovoEstande(false)}
+                  <button type="button" onClick={() => setShowNovaPessoa(false)}
                     className="flex-1 py-3 rounded-xl glass hover:bg-white/[0.08] font-semibold">
                     Cancelar
                   </button>
                   <button type="submit" disabled={criando}
                     className="flex-1 btn-primary py-3 rounded-xl font-semibold disabled:opacity-50">
-                    {criando ? 'Criando...' : 'Criar estande'}
+                    {criando ? 'Criando...' : 'Criar pessoa'}
                   </button>
                 </div>
               </form>
@@ -374,35 +351,32 @@ export default function AreaAdmin({ onVoltar }: Props) {
     )
   }
 
-  // ============================================
-  // VIEW: Fotos de um estande específico
-  // ============================================
+  // VIEW: Fotos de uma pessoa
   return (
     <div className="min-h-screen text-white">
       <nav className="sticky top-0 z-50 glass border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button onClick={() => setEstandeSelecionado(null)} className="flex items-center gap-2 text-sm text-white/60 hover:text-white">
+          <button onClick={() => setPessoaSelecionada(null)} className="flex items-center gap-2 text-sm text-white/60 hover:text-white">
             <ArrowLeft className="w-4 h-4" />
-            Todos os estandes
+            Todas as pessoas
           </button>
           <div className="text-center flex-1">
-            <h2 className="font-bold text-lg">{estandeSelecionado.nome}</h2>
-            <p className="text-xs text-white/50 font-mono">{estandeSelecionado.codigo}</p>
+            <h2 className="font-bold text-lg">{pessoaSelecionada.nome}</h2>
+            <p className="text-xs text-white/50 font-mono">{pessoaSelecionada.codigo}</p>
           </div>
           <button
-            onClick={() => copiarCodigo(estandeSelecionado.codigo)}
+            onClick={() => copiarCodigo(pessoaSelecionada.codigo)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg glass text-xs hover:bg-white/[0.08]"
           >
-            {codigoCopiado ? <><Check className="w-3 h-3 text-green-400" /> Copiado</> : <><Copy className="w-3 h-3" /> Copiar código</>}
+            {codigoCopiado ? <><Check className="w-3 h-3 text-green-400" /> Copiado</> : <><Copy className="w-3 h-3" /> Copiar</>}
           </button>
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
-        {/* Upload de foto */}
         <section className="mb-12">
           <div className="glass-strong rounded-3xl p-8">
-            <h3 className="text-xl font-bold mb-6">Adicionar foto ao estande</h3>
+            <h3 className="text-xl font-bold mb-6">Adicionar foto</h3>
 
             <form onSubmit={handleUploadFoto} className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
@@ -435,7 +409,7 @@ export default function AreaAdmin({ onVoltar }: Props) {
                   Título *
                 </label>
                 <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)}
-                  placeholder="Ex: Estande principal" className="w-full px-4 py-3 rounded-xl" required />
+                  placeholder="Ex: Foto no estande" className="w-full px-4 py-3 rounded-xl" required />
               </div>
 
               <div>
@@ -470,21 +444,20 @@ export default function AreaAdmin({ onVoltar }: Props) {
           </div>
         </section>
 
-        {/* Lista de fotos */}
         <section>
           <div className="flex items-baseline justify-between mb-6">
-            <h3 className="text-2xl font-bold">Fotos do estande</h3>
-            <span className="text-sm text-white/50">{fotosEstande.length} {fotosEstande.length === 1 ? 'foto' : 'fotos'}</span>
+            <h3 className="text-2xl font-bold">Fotos</h3>
+            <span className="text-sm text-white/50">{fotosPessoa.length} {fotosPessoa.length === 1 ? 'foto' : 'fotos'}</span>
           </div>
 
-          {fotosEstande.length === 0 ? (
+          {fotosPessoa.length === 0 ? (
             <div className="text-center py-20 glass-strong rounded-3xl">
               <div className="text-6xl mb-4">📷</div>
-              <p className="text-white/50">Nenhuma foto ainda. Comece adicionando acima.</p>
+              <p className="text-white/50">Nenhuma foto ainda. Adicione a primeira acima.</p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {fotosEstande.map((foto) => (
+              {fotosPessoa.map((foto) => (
                 <div key={foto.id} className="glass-strong rounded-2xl overflow-hidden group">
                   <div className="relative aspect-[4/3]">
                     <img src={foto.url} alt={foto.titulo} className="w-full h-full object-cover" />

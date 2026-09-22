@@ -2,34 +2,32 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Foto, Estande } from '@/types'
+import type { Foto, Pessoa } from '@/types'
 import AreaCliente from '@/components/AreaCliente'
 import AreaAdmin from '@/components/AreaAdmin'
-import { Upload, Camera, Lock } from 'lucide-react'
-
-type View = 'home' | 'cliente' | 'admin'
+import { Camera, Lock } from 'lucide-react'
 
 export default function Home() {
-  const [view, setView] = useState<View>('home')
+  const [view, setView] = useState<'home' | 'cliente' | 'admin'>('home')
   const [codigo, setCodigo] = useState('')
   const [buscando, setBuscando] = useState(false)
   const [erro, setErro] = useState('')
   const [senhaAdmin, setSenhaAdmin] = useState('')
   const [adminAutenticado, setAdminAutenticado] = useState(false)
 
-  async function buscarEstande(e: React.FormEvent) {
+  async function buscarPessoa(e: React.FormEvent) {
     e.preventDefault()
     setErro('')
 
     if (!codigo.trim()) {
-      setErro('Digite o código do seu estande')
+      setErro('Digite seu código de acesso')
       return
     }
 
     setBuscando(true)
 
     const { data, error } = await supabase
-      .from('estandes')
+      .from('pessoas')
       .select('*')
       .eq('codigo', codigo.trim().toUpperCase())
       .single()
@@ -40,11 +38,10 @@ export default function Home() {
       return
     }
 
-    // Buscar fotos do estande
     const { data: fotos, error: fotosError } = await supabase
       .from('fotos')
       .select('*')
-      .eq('estande_id', data.id)
+      .eq('pessoa_id', data.id)
       .order('created_at', { ascending: false })
 
     setBuscando(false)
@@ -55,8 +52,7 @@ export default function Home() {
     }
 
     setView('cliente')
-    // Passar dados via state global (em produção usaria contexto/URL)
-    sessionStorage.setItem('estande', JSON.stringify(data))
+    sessionStorage.setItem('pessoa', JSON.stringify(data))
     sessionStorage.setItem('fotos', JSON.stringify(fotos || []))
   }
 
@@ -69,16 +65,15 @@ export default function Home() {
     }
   }
 
-  // Se estiver na área do cliente
   if (view === 'cliente') {
-    const estande: Estande = JSON.parse(sessionStorage.getItem('estande') || '{}')
+    const pessoa: Pessoa = JSON.parse(sessionStorage.getItem('pessoa') || '{}')
     const fotos: Foto[] = JSON.parse(sessionStorage.getItem('fotos') || '[]')
     return (
       <AreaCliente
-        estande={estande}
+        pessoa={pessoa}
         fotos={fotos}
         onVoltar={() => {
-          sessionStorage.removeItem('estande')
+          sessionStorage.removeItem('pessoa')
           sessionStorage.removeItem('fotos')
           setView('home')
           setCodigo('')
@@ -87,7 +82,6 @@ export default function Home() {
     )
   }
 
-  // Se estiver autenticado como admin
   if (view === 'admin' && adminAutenticado) {
     return <AreaAdmin onVoltar={() => setView('home')} />
   }
@@ -106,7 +100,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">Clickefotos</h1>
-              <p className="text-xs text-white/50 -mt-0.5">Feira de Empreendedorismo</p>
+              <p className="text-xs text-white/50 -mt-0.5">Suas fotos da feira</p>
             </div>
           </div>
           <button
@@ -120,7 +114,6 @@ export default function Home() {
       </nav>
 
       <main className="max-w-5xl mx-auto px-6 py-20">
-        {/* Hero */}
         <section className="text-center mb-16 animate-fade-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-xs font-medium mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span>
@@ -131,12 +124,11 @@ export default function Home() {
             <span className="gradient-text">em um só lugar.</span>
           </h2>
           <p className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
-            Digite o código que você recebeu na feira e veja todas as fotos
-            do seu estande. Escolha as melhores e leve em alta resolução.
+            Digite o código que você recebeu na feira e veja todas as suas fotos.
+            Escolha as melhores e leve em alta resolução.
           </p>
         </section>
 
-        {/* Se estiver tentando entrar como admin */}
         {view === 'admin' && !adminAutenticado ? (
           <section className="max-w-md mx-auto animate-fade-up">
             <div className="glass-strong rounded-3xl p-8">
@@ -185,7 +177,6 @@ export default function Home() {
             </div>
           </section>
         ) : (
-          /* Card de acesso do cliente */
           <section className="max-w-md mx-auto animate-fade-up" style={{ animationDelay: '0.2s' }}>
             <div className="glass-strong rounded-3xl p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -198,10 +189,10 @@ export default function Home() {
                 </div>
               </div>
 
-              <form onSubmit={buscarEstande} className="space-y-4">
+              <form onSubmit={buscarPessoa} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    Código do estande
+                    Código de acesso
                   </label>
                   <input
                     type="text"
@@ -231,7 +222,7 @@ export default function Home() {
                     </>
                   ) : (
                     <>
-                      <Upload className="w-4 h-4" />
+                      <Camera className="w-4 h-4" />
                       Ver minhas fotos
                     </>
                   )}
@@ -247,11 +238,10 @@ export default function Home() {
           </section>
         )}
 
-        {/* Como funciona */}
         <section className="mt-20 grid md:grid-cols-3 gap-6 animate-fade-up" style={{ animationDelay: '0.4s' }}>
           {[
             { num: '01', icon: '🎫', title: 'Digite o código', desc: 'Receba seu código único na feira' },
-            { num: '02', icon: '📸', title: 'Veja suas fotos', desc: 'Todas as fotos do seu estande' },
+            { num: '02', icon: '📸', title: 'Veja suas fotos', desc: 'Todas as suas fotos aparecem aqui' },
             { num: '03', icon: '⬇️', title: 'Baixe em HD', desc: 'Compre e leve em alta resolução' },
           ].map((step) => (
             <div key={step.num} className="glass rounded-2xl p-6">

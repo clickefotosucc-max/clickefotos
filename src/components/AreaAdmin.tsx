@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Foto, Pessoa } from '@/types'
+import { aplicarMarcaDagua } from '@/lib/watermark'
 import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, User } from 'lucide-react'
 
 interface Props {
@@ -148,60 +149,57 @@ export default function AreaAdmin({ onVoltar }: Props) {
 
     setUploading(true)
 
-    const nomeBase = `${pessoaSelecionada.codigo}-${Date.now()}`
+    try {
+      // Aplica marca d'água na imagem de preview
+      const previewBlob = await aplicarMarcaDagua(arquivo, 'CLICKEFOTOS')
+      const previewFile = new File([previewBlob], `preview-${arquivo.name}`, { type: arquivo.type })
 
-    // Upload da foto em alta resolução (HD)
-    const { error: uploadHDError } = await supabase.storage
-      .from('fotos-hd')
-      .upload(`${nomeBase}-hd`, arquivo)
+      const nomeBase = `${pessoaSelecionada.codigo}-${Date.now()}`
 
-    if (uploadHDError) {
-      alert('Erro no upload: ' + uploadHDError.message)
+      // Upload da foto ORIGINAL em alta resolução (HD) - SEM marca d'água
+      const { error: uploadHDError } = await supabase.storage
+        .from('fotos-hd')
+        .upload(`${nomeBase}-hd`, arquivo)
+
+      if (uploadHDError) throw new Error('Erro no upload HD: ' + uploadHDError.message)
+
+      const { data: urlHDData } = supabase.storage
+        .from('fotos-hd')
+        .getPublicUrl(`${nomeBase}-hd`)
+
+      // Upload da versão COM marca d'água (preview público)
+      const { error: uploadPreviewError } = await supabase.storage
+        .from('fotos')
+        .upload(`${nomeBase}-preview`, previewFile)
+
+      if (uploadPreviewError) throw new Error('Erro no upload preview: ' + uploadPreviewError.message)
+
+      const { data: urlPreviewData } = supabase.storage
+        .from('fotos')
+        .getPublicUrl(`${nomeBase}-preview`)
+
+      const { error: insertError } = await supabase.from('fotos').insert([{
+        pessoa_id: pessoaSelecionada.id,
+        titulo,
+        descricao: descricao || null,
+        url: urlPreviewData.publicUrl,
+        url_hd: urlHDData.publicUrl,
+      }])
+
+      if (insertError) throw new Error('Erro ao salvar: ' + insertError.message)
+
+      setTitulo('')
+      setDescricao('')
+      setArquivo(null)
+      setPreviewUrl(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+
+      await carregarFotosPessoa(pessoaSelecionada)
+    } catch (err: any) {
+      alert(err.message || 'Erro ao processar foto')
+    } finally {
       setUploading(false)
-      return
     }
-
-    const { data: urlHDData } = supabase.storage
-      .from('fotos-hd')
-      .getPublicUrl(`${nomeBase}-hd`)
-
-    // Upload da versão preview (mesma imagem por enquanto)
-    const { error: uploadPreviewError } = await supabase.storage
-      .from('fotos')
-      .upload(`${nomeBase}-preview`, arquivo)
-
-    if (uploadPreviewError) {
-      alert('Erro no upload: ' + uploadPreviewError.message)
-      setUploading(false)
-      return
-    }
-
-    const { data: urlPreviewData } = supabase.storage
-      .from('fotos')
-      .getPublicUrl(`${nomeBase}-preview`)
-
-    const { error: insertError } = await supabase.from('fotos').insert([{
-      pessoa_id: pessoaSelecionada.id,
-      titulo,
-      descricao: descricao || null,
-      url: urlPreviewData.publicUrl,
-      url_hd: urlHDData.publicUrl,
-    }])
-
-    setUploading(false)
-
-    if (insertError) {
-      alert('Erro ao salvar: ' + insertError.message)
-      return
-    }
-
-    setTitulo('')
-    setDescricao('')
-    setArquivo(null)
-    setPreviewUrl(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-
-    await carregarFotosPessoa(pessoaSelecionada)
   }
 
   async function deletarFoto(foto: Foto) {

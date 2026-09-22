@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Foto, Pessoa } from '@/types'
 import { ArrowLeft, Download, Lock, Check, X } from 'lucide-react'
@@ -19,6 +19,17 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
   const [email, setEmail] = useState('')
   const [nome, setNome] = useState('')
   const [downloadsUsados, setDownloadsUsados] = useState(0)
+
+  useEffect(() => {
+    function bloquearContexto(e: MouseEvent) {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'IMG') {
+        e.preventDefault()
+      }
+    }
+    document.addEventListener('contextmenu', bloquearContexto)
+    return () => document.removeEventListener('contextmenu', bloquearContexto)
+  }, [])
 
   async function iniciarCompra(foto: Foto) {
     setFotoSelecionada(foto)
@@ -139,13 +150,10 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                   <img
                     src={foto.url}
                     alt={foto.titulo}
-                    className="photo-image w-full h-full object-cover"
+                    className="photo-image w-full h-full object-cover pointer-events-none select-none"
+                    draggable={false}
+                    onContextMenu={(e) => e.preventDefault()}
                   />
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <div className="text-white/40 text-2xl md:text-3xl font-black tracking-widest rotate-[-30deg] select-none">
-                      CLICKEFOTOS
-                    </div>
-                  </div>
                   {foto.vendida && (
                     <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold bg-green-500/90 text-white">
                       ✓ Comprada
@@ -204,11 +212,13 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
             className="glass-strong rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative aspect-[4/3] bg-black/20">
+            <div className="relative aspect-[4/3] bg-black/20 select-none">
               <img
                 src={fotoSelecionada.url}
                 alt={fotoSelecionada.titulo}
-                className="w-full h-full object-cover rounded-t-3xl"
+                className="w-full h-full object-cover rounded-t-3xl pointer-events-none"
+                draggable={false}
+                onContextMenu={(e) => e.preventDefault()}
               />
               <button
                 onClick={() => {

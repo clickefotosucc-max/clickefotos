@@ -59,7 +59,7 @@ export default function Home() {
     e.stopPropagation()
     if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true)
-    } else if (e.type === 'dragleave') || e.type === 'drop') {
+    } else if (e.type === 'dragleave' || e.type === 'drop') {
       setDragActive(false)
     }
   }

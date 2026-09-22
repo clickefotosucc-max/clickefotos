@@ -25,9 +25,10 @@ export default function AreaAdmin({ onVoltar }: Props) {
 
   const [titulo, setTitulo] = useState('')
   const [descricao, setDescricao] = useState('')
-  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [arquivos, setArquivos] = useState<File[]>([])
+  const [previewsUrls, setPreviewsUrls] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [progressoUpload, setProgressoUpload] = useState({ atual: 0, total: 0 })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [codigoCopiado, setCodigoCopiado] = useState(false)
 
@@ -110,6 +111,12 @@ export default function AreaAdmin({ onVoltar }: Props) {
 
   async function carregarFotosPessoa(pessoa: Pessoa) {
     setPessoaSelecionada(pessoa)
+    // Limpa estado de upload quando troca de pessoa
+    setArquivos([])
+    setPreviewsUrls([])
+    setTitulo('')
+    setDescricao('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
     const { data, error } = await supabase
       .from('fotos')
       .select('*')
@@ -191,73 +198,147 @@ export default function AreaAdmin({ onVoltar }: Props) {
     await carregarPessoas()
   }
 
-  function handleFile(file: File | null) {
-    setArquivo(file)
-    if (file) {
-      const url = URL.createObjectURL(file)
-      setPreviewUrl(url)
-    } else {
-      setPreviewUrl(null)
+  // Helper: remove acentos e espaços
+  function normalizarNome(nome: string): string {
+    return nome
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '') // remove acentos
+      .replace(/\s+/g, '') // remove espaços
+  }
+
+  // Gera próximo título no formato "NomeSequencial_001"
+  function gerarProximoTitulo(): string {
+    if (!pessoaSelecionada) return ''
+    const nomeBase = normalizarNome(pessoaSelecionada.nome)
+    const proximoNumero = fotos.length + 1
+    return `${nomeBase}_${proximoNumero.toString().padStart(3, '0')}`
+  }
+
+  function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+
+    // Libera URLs antigas pra evitar memory leak
+    setPreviewsUrls(prev => {
+      prev.forEach(url => URL.revokeObjectURL(url))
+      return []
+    })
+
+    // Filtra só imagens
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
+    if (imageFiles.length === 0) {
+      alert('Nenhuma imagem válida selecionada')
+      return
     }
+
+    setArquivos(imageFiles)
+
+    // Gera previews
+    const urls = imageFiles.map(f => URL.createObjectURL(f))
+    setPreviewsUrls(urls)
+
+    // Sugere título automaticamente se estiver vazio
+    if (!titulo) {
+      setTitulo(gerarProximoTitulo())
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    handleFiles(e.dataTransfer.files)
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  function handleDiretorio() {
+    // Cria input escondido com suporte a pasta
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    // @ts-ignore
+    input.webkitdirectory = true
+    // @ts-ignore
+    input.directory = true
+    input.accept = 'image/*'
+    input.onchange = (e: any) => handleFiles(e.target.files)
+    input.click()
   }
 
   async function handleUploadFoto(e: React.FormEvent) {
     e.preventDefault()
-    if (!pessoaSelecionada || !arquivo || !titulo) {
-      alert('Preencha título e selecione uma imagem')
+    if (!pessoaSelecionada || arquivos.length === 0) {
+      alert('Selecione pelo menos uma imagem')
       return
     }
 
     setUploading(true)
+    setProgressoUpload({ atual: 0, total: arquivos.length })
 
     try {
-      // Aplica marca d'água na imagem de preview
-      const previewBlob = await aplicarMarcaDagua(arquivo, 'CLICKEFOTOS')
-      const previewFile = new File([previewBlob], `preview-${arquivo.name}`, { type: arquivo.type })
+      // Lê chave PIX e WhatsApp pra salvar no metadata da compra
+      const configSalva = localStorage.getItem('clickefotos-config')
 
-      const nomeBase = `${pessoaSelecionada.codigo}-${Date.now()}`
+      for (let i = 0; i < arquivos.length; i++) {
+        const arquivo = arquivos[i]
+        setProgressoUpload({ atual: i + 1, total: arquivos.length })
 
-      // Upload da foto ORIGINAL em alta resolução (HD) - SEM marca d'água
-      const { error: uploadHDError } = await supabase.storage
-        .from('fotos-hd')
-        .upload(`${nomeBase}-hd`, arquivo)
+        // Gera título individual: Nome_001, Nome_002...
+        const numeroFoto = fotos.length + i + 1
+        const tituloFoto = `${normalizarNome(pessoaSelecionada.nome)}_${numeroFoto.toString().padStart(3, '0')}`
 
-      if (uploadHDError) throw new Error('Erro no upload HD: ' + uploadHDError.message)
+        // Aplica marca d'água na imagem de preview
+        const previewBlob = await aplicarMarcaDagua(arquivo, 'CLICKEFOTOS')
+        const previewFile = new File([previewBlob], `preview-${arquivo.name}`, { type: arquivo.type })
 
-      const { data: urlHDData } = supabase.storage
-        .from('fotos-hd')
-        .getPublicUrl(`${nomeBase}-hd`)
+        const nomeBase = `${pessoaSelecionada.codigo}-${Date.now()}-${i}`
 
-      // Upload da versão COM marca d'água (preview público)
-      const { error: uploadPreviewError } = await supabase.storage
-        .from('fotos')
-        .upload(`${nomeBase}-preview`, previewFile)
+        // Upload da foto ORIGINAL em alta resolução (HD) - SEM marca d'água
+        const { error: uploadHDError } = await supabase.storage
+          .from('fotos-hd')
+          .upload(`${nomeBase}-hd`, arquivo)
 
-      if (uploadPreviewError) throw new Error('Erro no upload preview: ' + uploadPreviewError.message)
+        if (uploadHDError) throw new Error(`Erro no upload HD da foto ${i + 1}: ` + uploadHDError.message)
 
-      const { data: urlPreviewData } = supabase.storage
-        .from('fotos')
-        .getPublicUrl(`${nomeBase}-preview`)
+        const { data: urlHDData } = supabase.storage
+          .from('fotos-hd')
+          .getPublicUrl(`${nomeBase}-hd`)
 
-      const { error: insertError } = await supabase.from('fotos').insert([{
-        pessoa_id: pessoaSelecionada.id,
-        titulo,
-        descricao: descricao || null,
-        url: urlPreviewData.publicUrl,
-        url_hd: urlHDData.publicUrl,
-      }])
+        // Upload da versão COM marca d'água (preview público)
+        const { error: uploadPreviewError } = await supabase.storage
+          .from('fotos')
+          .upload(`${nomeBase}-preview`, previewFile)
 
-      if (insertError) throw new Error('Erro ao salvar: ' + insertError.message)
+        if (uploadPreviewError) throw new Error(`Erro no upload preview da foto ${i + 1}: ` + uploadPreviewError.message)
 
+        const { data: urlPreviewData } = supabase.storage
+          .from('fotos')
+          .getPublicUrl(`${nomeBase}-preview`)
+
+        const { error: insertError } = await supabase.from('fotos').insert([{
+          pessoa_id: pessoaSelecionada.id,
+          titulo: tituloFoto,
+          descricao: descricao || null,
+          url: urlPreviewData.publicUrl,
+          url_hd: urlHDData.publicUrl,
+        }])
+
+        if (insertError) throw new Error('Erro ao salvar foto ' + (i + 1) + ': ' + insertError.message)
+      }
+
+      // Limpa tudo
       setTitulo('')
       setDescricao('')
-      setArquivo(null)
-      setPreviewUrl(null)
+      setArquivos([])
+      setPreviewsUrls([])
       if (fileInputRef.current) fileInputRef.current.value = ''
 
       await carregarFotosPessoa(pessoaSelecionada)
+      alert(`✅ ${arquivos.length} foto(s) enviada(s) com sucesso!`)
     } catch (err: any) {
-      alert(err.message || 'Erro ao processar foto')
+      alert(err.message || 'Erro ao processar fotos')
     } finally {
       setUploading(false)
     }
@@ -614,48 +695,84 @@ export default function AreaAdmin({ onVoltar }: Props) {
               <div className="md:col-span-2">
                 <div
                   onClick={() => fileInputRef.current?.click()}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
                   className="cursor-pointer rounded-2xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/[0.02] transition-all overflow-hidden"
                 >
-                  {previewUrl ? (
-                    <div className="relative aspect-video">
-                      <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                  {previewsUrls.length > 0 ? (
+                    <div className="p-4">
+                      <div className="text-sm text-white/60 mb-3 flex items-center justify-between">
+                        <span>{arquivos.length} {arquivos.length === 1 ? 'imagem selecionada' : 'imagens selecionadas'}</span>
+                        <span className="text-xs text-violet-400">Clique pra trocar</span>
+                      </div>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-64 overflow-y-auto">
+                        {previewsUrls.map((url, idx) => (
+                          <div key={idx} className="relative aspect-square rounded-lg overflow-hidden">
+                            <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ) : (
-                    <div className="aspect-video flex flex-col items-center justify-center gap-2">
-                      <div className="text-4xl">📸</div>
-                      <p className="text-white/60">Clique para selecionar a foto</p>
+                    <div className="aspect-video flex flex-col items-center justify-center gap-2 p-8">
+                      <div className="text-5xl">📸</div>
+                      <p className="text-white/80 font-semibold">Clique ou arraste fotos aqui</p>
+                      <p className="text-sm text-white/50">Você pode selecionar várias de uma vez, ou uma pasta inteira</p>
                     </div>
                   )}
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    onChange={(e) => handleFile(e.target.files?.[0] || null)}
+                    multiple
+                    onChange={(e) => handleFiles(e.target.files)}
                     className="hidden"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                  Título *
-                </label>
-                <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)}
-                  placeholder="Ex: Foto no estande" className="w-full px-4 py-3 rounded-xl" required />
+                <p className="text-xs text-white/40 mt-2 flex items-center gap-2 flex-wrap">
+                  <span>💡 <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white/70">Ctrl+clique</kbd> pra várias fotos</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDiretorio()
+                    }}
+                    className="text-violet-400 hover:text-violet-300 underline"
+                  >
+                    ou selecione uma pasta inteira
+                  </button>
+                </p>
               </div>
 
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                  Descrição
+                  {arquivos.length > 1 ? `Títulos serão automáticos: ${normalizarNome(pessoaSelecionada.nome)}_${(fotos.length + 1).toString().padStart(3, '0')} até _${(fotos.length + arquivos.length).toString().padStart(3, '0')}` : 'Título *'}
+                </label>
+                {arquivos.length <= 1 && (
+                  <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)}
+                    placeholder={gerarProximoTitulo()} className="w-full px-4 py-3 rounded-xl" />
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
+                  Descrição (opcional, aplica a todas)
                 </label>
                 <input type="text" value={descricao} onChange={(e) => setDescricao(e.target.value)}
-                  placeholder="Descrição da foto..." className="w-full px-4 py-3 rounded-xl" />
+                  placeholder="Descrição das fotos..." className="w-full px-4 py-3 rounded-xl" />
               </div>
 
               <div className="md:col-span-2">
-                <button type="submit" disabled={uploading}
+                <button type="submit" disabled={uploading || arquivos.length === 0}
                   className="btn-primary w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
-                  {uploading ? <><span className="animate-spin">⏳</span> Enviando...</> : <><Upload className="w-4 h-4" /> Adicionar foto</>}
+                  {uploading ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      Enviando {progressoUpload.atual}/{progressoUpload.total}...
+                    </>
+                  ) : (
+                    <><Upload className="w-4 h-4" /> Adicionar {arquivos.length > 1 ? `${arquivos.length} fotos` : 'foto'}</>
+                  )}
                 </button>
               </div>
             </form>

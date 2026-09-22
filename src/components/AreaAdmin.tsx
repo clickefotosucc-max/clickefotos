@@ -25,11 +25,9 @@ export default function AreaAdmin({ onVoltar }: Props) {
   const [titulo, setTitulo] = useState('')
   const [descricao, setDescricao] = useState('')
   const [arquivo, setArquivo] = useState<File | null>(null)
-  const [arquivoHD, setArquivoHD] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const fileInputHDRef = useRef<HTMLInputElement>(null)
   const [codigoCopiado, setCodigoCopiado] = useState(false)
 
   useEffect(() => {
@@ -151,40 +149,43 @@ export default function AreaAdmin({ onVoltar }: Props) {
     setUploading(true)
 
     const nomeBase = `${pessoaSelecionada.codigo}-${Date.now()}`
-    const { error: uploadError } = await supabase.storage
-      .from('fotos')
-      .upload(`${nomeBase}-preview`, arquivo)
 
-    if (uploadError) {
-      alert('Erro no upload: ' + uploadError.message)
+    // Upload da foto em alta resolução (HD)
+    const { error: uploadHDError } = await supabase.storage
+      .from('fotos-hd')
+      .upload(`${nomeBase}-hd`, arquivo)
+
+    if (uploadHDError) {
+      alert('Erro no upload: ' + uploadHDError.message)
       setUploading(false)
       return
     }
 
-    const { data: urlData } = supabase.storage
+    const { data: urlHDData } = supabase.storage
+      .from('fotos-hd')
+      .getPublicUrl(`${nomeBase}-hd`)
+
+    // Upload da versão preview (mesma imagem por enquanto)
+    const { error: uploadPreviewError } = await supabase.storage
+      .from('fotos')
+      .upload(`${nomeBase}-preview`, arquivo)
+
+    if (uploadPreviewError) {
+      alert('Erro no upload: ' + uploadPreviewError.message)
+      setUploading(false)
+      return
+    }
+
+    const { data: urlPreviewData } = supabase.storage
       .from('fotos')
       .getPublicUrl(`${nomeBase}-preview`)
-
-    let urlHD = urlData.publicUrl
-    const arquivoHDFinal = arquivoHD || arquivo
-
-    const { error: uploadHDError } = await supabase.storage
-      .from('fotos-hd')
-      .upload(`${nomeBase}-hd`, arquivoHDFinal)
-
-    if (!uploadHDError) {
-      const { data: urlHDData } = supabase.storage
-        .from('fotos-hd')
-        .getPublicUrl(`${nomeBase}-hd`)
-      urlHD = urlHDData.publicUrl
-    }
 
     const { error: insertError } = await supabase.from('fotos').insert([{
       pessoa_id: pessoaSelecionada.id,
       titulo,
       descricao: descricao || null,
-      url: urlData.publicUrl,
-      url_hd: urlHD,
+      url: urlPreviewData.publicUrl,
+      url_hd: urlHDData.publicUrl,
     }])
 
     setUploading(false)
@@ -197,10 +198,8 @@ export default function AreaAdmin({ onVoltar }: Props) {
     setTitulo('')
     setDescricao('')
     setArquivo(null)
-    setArquivoHD(null)
     setPreviewUrl(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
-    if (fileInputHDRef.current) fileInputHDRef.current.value = ''
 
     await carregarFotosPessoa(pessoaSelecionada)
   }
@@ -434,20 +433,6 @@ export default function AreaAdmin({ onVoltar }: Props) {
                 </label>
                 <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)}
                   placeholder="Ex: Foto no estande" className="w-full px-4 py-3 rounded-xl" required />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                  Versão HD (opcional)
-                </label>
-                <input
-                  ref={fileInputHDRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setArquivoHD(e.target.files?.[0] || null)}
-                  className="w-full px-4 py-3 rounded-xl text-sm"
-                />
-                <p className="text-xs text-white/40 mt-1">Se vazio, usa a mesma foto acima</p>
               </div>
 
               <div className="md:col-span-2">

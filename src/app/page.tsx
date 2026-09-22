@@ -1,159 +1,96 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Foto } from '@/types'
+import type { Foto, Estande } from '@/types'
+import AreaCliente from '@/components/AreaCliente'
+import AreaAdmin from '@/components/AreaAdmin'
+import { Upload, Camera, Lock } from 'lucide-react'
+
+type View = 'home' | 'cliente' | 'admin'
 
 export default function Home() {
-  const [fotos, setFotos] = useState<Foto[]>([])
-  const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState(false)
-  const [dragActive, setDragActive] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
-  const [filter, setFilter] = useState<string>('todas')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [view, setView] = useState<View>('home')
+  const [codigo, setCodigo] = useState('')
+  const [buscando, setBuscando] = useState(false)
+  const [erro, setErro] = useState('')
+  const [senhaAdmin, setSenhaAdmin] = useState('')
+  const [adminAutenticado, setAdminAutenticado] = useState(false)
 
-  // Form states
-  const [titulo, setTitulo] = useState('')
-  const [descricao, setDescricao] = useState('')
-  const [autor, setAutor] = useState('')
-  const [categoria, setCategoria] = useState('geral')
-  const [arquivo, setArquivo] = useState<File | null>(null)
+  async function buscarEstande(e: React.FormEvent) {
+    e.preventDefault()
+    setErro('')
 
-  useEffect(() => {
-    carregarFotos()
-    // Carrega likes do localStorage
-    const stored = localStorage.getItem('clickefotos-likes')
-    if (stored) {
-      try {
-        setLikedIds(new Set(JSON.parse(stored)))
-      } catch {}
+    if (!codigo.trim()) {
+      setErro('Digite o código do seu estande')
+      return
     }
-  }, [])
 
-  async function carregarFotos() {
+    setBuscando(true)
+
     const { data, error } = await supabase
+      .from('estandes')
+      .select('*')
+      .eq('codigo', codigo.trim().toUpperCase())
+      .single()
+
+    if (error || !data) {
+      setErro('Código não encontrado. Verifique com o organizador.')
+      setBuscando(false)
+      return
+    }
+
+    // Buscar fotos do estande
+    const { data: fotos, error: fotosError } = await supabase
       .from('fotos')
       .select('*')
+      .eq('estande_id', data.id)
       .order('created_at', { ascending: false })
 
-    if (!error && data) {
-      setFotos(data)
-    }
-    setLoading(false)
-  }
+    setBuscando(false)
 
-  function handleFile(file: File | null) {
-    setArquivo(file)
-    if (file) {
-      const url = URL.createObjectURL(file)
-      setPreviewUrl(url)
-    } else {
-      setPreviewUrl(null)
-    }
-  }
-
-  function handleDrag(e: React.DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave' || e.type === 'drop') {
-      setDragActive(false)
-    }
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0])
-    }
-  }
-
-  async function handleUpload(e: React.FormEvent) {
-    e.preventDefault()
-
-    if (!arquivo || !titulo || !autor) {
-      alert('Preencha todos os campos obrigatórios!')
+    if (fotosError) {
+      setErro('Erro ao carregar fotos')
       return
     }
 
-    setUploading(true)
+    setView('cliente')
+    // Passar dados via state global (em produção usaria contexto/URL)
+    sessionStorage.setItem('estande', JSON.stringify(data))
+    sessionStorage.setItem('fotos', JSON.stringify(fotos || []))
+  }
 
-    const nomeArquivo = `${Date.now()}-${arquivo.name.replace(/\s/g, '_')}`
-    const { error: uploadError } = await supabase.storage
-      .from('fotos')
-      .upload(nomeArquivo, arquivo)
-
-    if (uploadError) {
-      alert('Erro ao fazer upload da imagem: ' + uploadError.message)
-      setUploading(false)
-      return
-    }
-
-    const { data: urlData } = supabase.storage
-      .from('fotos')
-      .getPublicUrl(nomeArquivo)
-
-    const { error: insertError } = await supabase.from('fotos').insert([
-      {
-        titulo,
-        descricao: descricao || null,
-        autor,
-        categoria,
-        url: urlData.publicUrl,
-        likes: 0,
-      },
-    ])
-
-    if (insertError) {
-      alert('Erro ao salvar: ' + insertError.message)
+  function handleAdmin(e: React.FormEvent) {
+    e.preventDefault()
+    if (senhaAdmin === 'admin123') {
+      setAdminAutenticado(true)
     } else {
-      setTitulo('')
-      setDescricao('')
-      setAutor('')
-      setArquivo(null)
-      setPreviewUrl(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      await carregarFotos()
+      setErro('Senha incorreta')
     }
-
-    setUploading(false)
   }
 
-  async function curtir(foto: Foto) {
-    if (likedIds.has(foto.id)) return
-
-    const novosLiked = new Set(likedIds)
-    novosLiked.add(foto.id)
-    setLikedIds(novosLiked)
-    localStorage.setItem('clickefotos-likes', JSON.stringify([...novosLiked]))
-
-    await supabase
-      .from('fotos')
-      .update({ likes: foto.likes + 1 })
-      .eq('id', foto.id)
-
-    carregarFotos()
+  // Se estiver na área do cliente
+  if (view === 'cliente') {
+    const estande: Estande = JSON.parse(sessionStorage.getItem('estande') || '{}')
+    const fotos: Foto[] = JSON.parse(sessionStorage.getItem('fotos') || '[]')
+    return (
+      <AreaCliente
+        estande={estande}
+        fotos={fotos}
+        onVoltar={() => {
+          sessionStorage.removeItem('estande')
+          sessionStorage.removeItem('fotos')
+          setView('home')
+          setCodigo('')
+        }}
+      />
+    )
   }
 
-  const categorias = [
-    { value: 'todas', label: 'Todas', icon: '✨' },
-    { value: 'geral', label: 'Geral', icon: '📷' },
-    { value: 'produtos', label: 'Produtos', icon: '🛍️' },
-    { value: 'estandes', label: 'Estandes', icon: '🏪' },
-    { value: 'equipe', label: 'Equipe', icon: '👥' },
-    { value: 'apresentacoes', label: 'Apresentações', icon: '🎤' },
-  ]
-
-  const fotosFiltradas = filter === 'todas'
-    ? fotos
-    : fotos.filter(f => f.categoria === filter)
-
-  const totalLikes = fotos.reduce((acc, f) => acc + f.likes, 0)
+  // Se estiver autenticado como admin
+  if (view === 'admin' && adminAutenticado) {
+    return <AreaAdmin onVoltar={() => setView('home')} />
+  }
 
   return (
     <div className="min-h-screen text-white">
@@ -163,8 +100,8 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-cyan-500 blur-md opacity-60"></div>
-              <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-xl">
-                📸
+              <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
+                <Camera className="w-5 h-5" />
               </div>
             </div>
             <div>
@@ -172,315 +109,166 @@ export default function Home() {
               <p className="text-xs text-white/50 -mt-0.5">Feira de Empreendedorismo</p>
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-6">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-              <span className="text-white/60">Ao vivo</span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-sm">
-              <span className="text-cyan-400">📷</span>
-              <span className="font-semibold">{fotos.length}</span>
-              <span className="text-white/50">fotos</span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-sm">
-              <span className="text-pink-400">❤️</span>
-              <span className="font-semibold">{totalLikes}</span>
-              <span className="text-white/50">curtidas</span>
-            </div>
-          </div>
+          <button
+            onClick={() => setView('admin')}
+            className="flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-xs font-medium hover:bg-white/[0.08] transition-all"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            Área do Organizador
+          </button>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="relative max-w-7xl mx-auto px-6 pt-16 pb-12 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-xs font-medium mb-6 animate-fade-up">
-          <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span>
-          FEIRA DE EMPREENDEDORISMO 2025
-        </div>
-        <h2 className="text-5xl md:text-7xl font-black tracking-tight mb-6 animate-fade-up" style={{ animationDelay: '0.1s' }}>
-          Cada clique, <br />
-          <span className="gradient-text">uma história de negócio.</span>
-        </h2>
-        <p className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed animate-fade-up" style={{ animationDelay: '0.2s' }}>
-          Registre os melhores momentos da feira. Mostre seus produtos, sua equipe,
-          sua apresentação. Cada foto conta a história do seu empreendimento.
-        </p>
-      </section>
+      <main className="max-w-5xl mx-auto px-6 py-20">
+        {/* Hero */}
+        <section className="text-center mb-16 animate-fade-up">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-xs font-medium mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span>
+            FEIRA DE EMPREENDEDORISMO 2025
+          </div>
+          <h2 className="text-5xl md:text-7xl font-black tracking-tight mb-6">
+            Suas fotos da feira, <br />
+            <span className="gradient-text">em um só lugar.</span>
+          </h2>
+          <p className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
+            Digite o código que você recebeu na feira e veja todas as fotos
+            do seu estande. Escolha as melhores e leve em alta resolução.
+          </p>
+        </section>
 
-      <main className="max-w-7xl mx-auto px-6 pb-20">
-
-        {/* Formulário de Upload */}
-        <section className="mb-16 animate-fade-up" style={{ animationDelay: '0.3s' }}>
-          <div className="glass-strong rounded-3xl p-8 md:p-10">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-2xl">
-                ⬆️
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold">Enviar nova foto</h3>
-                <p className="text-sm text-white/50">Compartilhe um momento da feira</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleUpload} className="grid gap-6 md:grid-cols-2">
-              {/* Drop Zone */}
-              <div className="md:col-span-2">
-                <div
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`relative cursor-pointer rounded-2xl border-2 border-dashed transition-all overflow-hidden ${
-                    dragActive
-                      ? 'border-violet-400 bg-violet-500/10 scale-[1.02]'
-                      : 'border-white/10 hover:border-white/30 bg-white/[0.02]'
-                  }`}
-                >
-                  {previewUrl ? (
-                    <div className="relative aspect-video">
-                      <img
-                        src={previewUrl}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
-                        <div className="text-white text-sm font-medium">
-                          ✓ Arquivo selecionado — clique para trocar
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="aspect-video flex flex-col items-center justify-center gap-3 p-8">
-                      <div className="text-5xl animate-float">📸</div>
-                      <div className="text-center">
-                        <p className="font-semibold text-white/90">
-                          Arraste sua foto aqui
-                        </p>
-                        <p className="text-sm text-white/50 mt-1">
-                          ou clique para selecionar do dispositivo
-                        </p>
-                      </div>
-                      <div className="flex gap-2 mt-2 text-xs text-white/40">
-                        <span>PNG</span>•<span>JPG</span>•<span>WEBP</span>
-                      </div>
-                    </div>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                    required
-                  />
+        {/* Se estiver tentando entrar como admin */}
+        {view === 'admin' && !adminAutenticado ? (
+          <section className="max-w-md mx-auto animate-fade-up">
+            <div className="glass-strong rounded-3xl p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Área do Organizador</h3>
+                  <p className="text-sm text-white/50">Digite a senha para continuar</p>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                  Título da foto *
-                </label>
+              <form onSubmit={handleAdmin} className="space-y-4">
                 <input
-                  type="text"
-                  value={titulo}
-                  onChange={(e) => setTitulo(e.target.value)}
-                  placeholder="Ex: Estande EcoTech"
+                  type="password"
+                  value={senhaAdmin}
+                  onChange={(e) => setSenhaAdmin(e.target.value)}
+                  placeholder="Senha"
                   className="w-full px-4 py-3 rounded-xl"
-                  required
+                  autoFocus
                 />
+                {erro && (
+                  <p className="text-sm text-red-400">{erro}</p>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setView('home')
+                      setErro('')
+                      setSenhaAdmin('')
+                    }}
+                    className="flex-1 py-3 rounded-xl glass hover:bg-white/[0.08] font-semibold transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 btn-primary py-3 rounded-xl font-semibold"
+                  >
+                    Entrar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+        ) : (
+          /* Card de acesso do cliente */
+          <section className="max-w-md mx-auto animate-fade-up" style={{ animationDelay: '0.2s' }}>
+            <div className="glass-strong rounded-3xl p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-2xl">
+                  🎫
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Acessar minhas fotos</h3>
+                  <p className="text-sm text-white/50">Use o código recebido na feira</p>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                  Equipe / Autor *
-                </label>
-                <input
-                  type="text"
-                  value={autor}
-                  onChange={(e) => setAutor(e.target.value)}
-                  placeholder="Ex: Equipe EcoTech - 3ºA"
-                  className="w-full px-4 py-3 rounded-xl"
-                  required
-                />
-              </div>
+              <form onSubmit={buscarEstande} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
+                    Código do estande
+                  </label>
+                  <input
+                    type="text"
+                    value={codigo}
+                    onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+                    placeholder="Ex: ABC-X9K"
+                    className="w-full px-4 py-4 rounded-xl text-center text-2xl font-mono font-bold tracking-widest"
+                    maxLength={7}
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                  Categoria
-                </label>
-                <select
-                  value={categoria}
-                  onChange={(e) => setCategoria(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl"
-                >
-                  <option value="geral">📷 Geral</option>
-                  <option value="produtos">🛍️ Produtos</option>
-                  <option value="estandes">🏪 Estandes</option>
-                  <option value="equipe">👥 Equipe</option>
-                  <option value="apresentacoes">🎤 Apresentações</option>
-                </select>
-              </div>
+                {erro && (
+                  <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300">
+                    {erro}
+                  </div>
+                )}
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                  Descrição
-                </label>
-                <input
-                  type="text"
-                  value={descricao}
-                  onChange={(e) => setDescricao(e.target.value)}
-                  placeholder="Conte um pouco sobre a foto..."
-                  className="w-full px-4 py-3 rounded-xl"
-                />
-              </div>
-
-              <div className="md:col-span-2 pt-2">
                 <button
                   type="submit"
-                  disabled={uploading}
-                  className="btn-primary w-full py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={buscando}
+                  className="btn-primary w-full py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {uploading ? (
+                  {buscando ? (
                     <>
                       <span className="inline-block animate-spin">⏳</span>
-                      Enviando...
+                      Buscando...
                     </>
                   ) : (
                     <>
-                      <span>📤</span>
-                      Publicar foto
+                      <Upload className="w-4 h-4" />
+                      Ver minhas fotos
                     </>
                   )}
                 </button>
+              </form>
+
+              <div className="mt-6 pt-6 border-t border-white/5 text-center">
+                <p className="text-xs text-white/40">
+                  Não tem o código? Procure o organizador do evento.
+                </p>
               </div>
-            </form>
-          </div>
-        </section>
-
-        {/* Filtros */}
-        <section className="mb-8 animate-fade-up" style={{ animationDelay: '0.4s' }}>
-          <div className="flex items-center gap-3 overflow-x-auto pb-2 -mx-2 px-2">
-            {categorias.map((cat) => (
-              <button
-                key={cat.value}
-                onClick={() => setFilter(cat.value)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                  filter === cat.value
-                    ? 'bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg shadow-violet-500/30'
-                    : 'glass hover:bg-white/[0.08] text-white/70 hover:text-white'
-                }`}
-              >
-                <span>{cat.icon}</span>
-                {cat.label}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Galeria */}
-        <section>
-          {loading ? (
-            <div className="text-center py-24">
-              <div className="inline-block w-12 h-12 border-4 border-violet-500/30 border-t-violet-500 rounded-full animate-spin"></div>
-              <p className="text-white/50 mt-4">Carregando galeria...</p>
             </div>
-          ) : fotosFiltradas.length === 0 ? (
-            <div className="text-center py-24 glass-strong rounded-3xl">
-              <div className="text-7xl mb-4 opacity-50">📷</div>
-              <h3 className="text-xl font-semibold mb-2">Nenhuma foto ainda</h3>
-              <p className="text-white/50">
-                {filter === 'todas'
-                  ? 'Seja o primeiro a compartilhar um momento!'
-                  : 'Nenhuma foto nesta categoria.'}
-              </p>
+          </section>
+        )}
+
+        {/* Como funciona */}
+        <section className="mt-20 grid md:grid-cols-3 gap-6 animate-fade-up" style={{ animationDelay: '0.4s' }}>
+          {[
+            { num: '01', icon: '🎫', title: 'Digite o código', desc: 'Receba seu código único na feira' },
+            { num: '02', icon: '📸', title: 'Veja suas fotos', desc: 'Todas as fotos do seu estande' },
+            { num: '03', icon: '⬇️', title: 'Baixe em HD', desc: 'Compre e leve em alta resolução' },
+          ].map((step) => (
+            <div key={step.num} className="glass rounded-2xl p-6">
+              <div className="flex items-start justify-between mb-4">
+                <span className="text-3xl">{step.icon}</span>
+                <span className="text-xs font-mono text-white/30">{step.num}</span>
+              </div>
+              <h4 className="font-bold text-lg mb-1">{step.title}</h4>
+              <p className="text-sm text-white/50">{step.desc}</p>
             </div>
-          ) : (
-            <>
-              <div className="flex items-baseline justify-between mb-6">
-                <h3 className="text-2xl font-bold">
-                  {filter === 'todas' ? 'Galeria' : categorias.find(c => c.value === filter)?.label}
-                </h3>
-                <span className="text-sm text-white/50">
-                  {fotosFiltradas.length} {fotosFiltradas.length === 1 ? 'foto' : 'fotos'}
-                </span>
-              </div>
-
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {fotosFiltradas.map((foto, idx) => {
-                  const liked = likedIds.has(foto.id)
-                  return (
-                    <article
-                      key={foto.id}
-                      className="photo-card glass-strong rounded-3xl overflow-hidden animate-fade-up"
-                      style={{ animationDelay: `${idx * 0.05}s` }}
-                    >
-                      <div className="relative aspect-[4/3] overflow-hidden bg-black/20">
-                        <img
-                          src={foto.url}
-                          alt={foto.titulo}
-                          className="photo-image w-full h-full object-cover"
-                        />
-                        <div className="absolute top-3 right-3">
-                          <span className="px-3 py-1 rounded-full text-xs font-semibold glass-strong backdrop-blur-xl">
-                            {foto.categoria}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-5">
-                        <h4 className="font-bold text-lg leading-tight line-clamp-1">
-                          {foto.titulo}
-                        </h4>
-                        <div className="flex items-center gap-2 mt-1 text-sm text-white/50">
-                          <span>@{foto.autor}</span>
-                        </div>
-                        {foto.descricao && (
-                          <p className="text-sm text-white/60 mt-3 line-clamp-2 leading-relaxed">
-                            {foto.descricao}
-                          </p>
-                        )}
-
-                        <div className="flex items-center justify-between mt-5 pt-4 border-t border-white/5">
-                          <button
-                            onClick={() => curtir(foto)}
-                            disabled={liked}
-                            className={`like-btn flex items-center gap-2 text-sm font-semibold ${
-                              liked ? 'liked' : ''
-                            } ${liked ? 'text-pink-400 cursor-default' : 'text-white/60 hover:text-pink-400'}`}
-                          >
-                            <span className="text-lg">{liked ? '❤️' : '🤍'}</span>
-                            <span>{foto.likes}</span>
-                          </button>
-                          <time className="text-xs text-white/40">
-                            {new Date(foto.created_at).toLocaleDateString('pt-BR', {
-                              day: '2-digit',
-                              month: 'short'
-                            })}
-                          </time>
-                        </div>
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
-            </>
-          )}
+          ))}
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-white/5 mt-12">
-        <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-sm">
-              📸
-            </div>
-            <span className="font-bold">Clickefotos</span>
-          </div>
-          <p className="text-sm text-white/40 text-center md:text-right">
-            Feito com 💜 para a Feira de Empreendedorismo — {new Date().getFullYear()}
-          </p>
+        <div className="max-w-7xl mx-auto px-6 py-10 text-center text-sm text-white/40">
+          Feito com 💜 para a Feira de Empreendedorismo — {new Date().getFullYear()}
         </div>
       </footer>
     </div>

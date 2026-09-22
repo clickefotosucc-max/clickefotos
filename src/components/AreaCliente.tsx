@@ -179,7 +179,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                         className="btn-primary w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
                       >
                         <Lock className="w-4 h-4" />
-                        Comprar HD • R$ {pessoa.preco_por_foto.toFixed(2)}
+                        Comprar HD • R$ {pessoa.preco_por_foto.toFixed(2).replace('.', ',')}
                       </button>
                     )}
                   </div>
@@ -226,7 +226,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                 <>
                   <h3 className="text-xl font-bold mb-2">Comprar foto em HD</h3>
                   <p className="text-sm text-white/60 mb-6">
-                    {fotoSelecionada.titulo} • R$ {pessoa.preco_por_foto.toFixed(2)}
+                    {fotoSelecionada.titulo} • R$ {pessoa.preco_por_foto.toFixed(2).replace('.', ',')}
                   </p>
 
                   <div className="space-y-4">
@@ -270,7 +270,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                       disabled={comprando || !email || !nome}
                       className="btn-primary w-full py-4 rounded-xl font-semibold disabled:opacity-50"
                     >
-                      {comprando ? 'Processando...' : `Pagar R$ ${pessoa.preco_por_foto.toFixed(2)}`}
+                      {comprando ? 'Processando...' : `Pagar R$ ${pessoa.preco_por_foto.toFixed(2).replace('.', ',')}`}
                     </button>
                   </div>
                 </>

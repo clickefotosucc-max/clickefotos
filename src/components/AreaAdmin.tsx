@@ -61,6 +61,20 @@ export default function AreaAdmin({ onVoltar }: Props) {
     }
   }
 
+  function formatarPreco(valor: string): string {
+    // Remove tudo que não é número
+    const nums = valor.replace(/\D/g, '')
+    // Converte para número e divide por 100 (pra ter casas decimais)
+    const num = parseInt(nums || '0') / 100
+    // Retorna com 2 casas decimais usando vírgula
+    return num.toFixed(2).replace('.', ',')
+  }
+
+  function precoParaNumero(valorFormatado: string): number {
+    // "5,00" -> 5.00
+    return parseFloat(valorFormatado.replace(',', '.'))
+  }
+
   async function criarPessoa(e: React.FormEvent) {
     e.preventDefault()
     if (!novoNome) {
@@ -99,7 +113,7 @@ export default function AreaAdmin({ onVoltar }: Props) {
       nome: novoNome,
       turma: novoTurma || null,
       descricao: novoDescricao || null,
-      preco_por_foto: parseFloat(novoPreco),
+      preco_por_foto: precoParaNumero(novoPreco),
     }])
 
     setCriando(false)
@@ -285,7 +299,7 @@ export default function AreaAdmin({ onVoltar }: Props) {
                     <p className="text-xs text-white/40 mt-2 line-clamp-2">{pessoa.descricao}</p>
                   )}
                   <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-xs">
-                    <span className="text-white/40">R$ {pessoa.preco_por_foto.toFixed(2)} / foto</span>
+                    <span className="text-white/40">R$ {pessoa.preco_por_foto.toFixed(2).replace('.', ',')} / foto</span>
                     <span className="text-violet-400 group-hover:translate-x-1 transition-transform">Ver fotos →</span>
                   </div>
                 </button>
@@ -329,8 +343,18 @@ export default function AreaAdmin({ onVoltar }: Props) {
                   <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
                     Preço por foto (R$)
                   </label>
-                  <input type="number" step="0.01" value={novoPreco} onChange={(e) => setNovoPreco(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl" />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 font-semibold">R$</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={novoPreco}
+                      onChange={(e) => setNovoPreco(formatarPreco(e.target.value))}
+                      placeholder="0,00"
+                      className="w-full pl-12 pr-4 py-3 rounded-xl font-mono"
+                    />
+                  </div>
+                  <p className="text-xs text-white/40 mt-1">Use vírgula para centavos (ex: 5,00)</p>
                 </div>
 
                 <div className="flex gap-3 pt-4">

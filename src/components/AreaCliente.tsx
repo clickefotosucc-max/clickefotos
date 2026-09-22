@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Foto, Pessoa } from '@/types'
-import { ArrowLeft, Download, Lock, Check, X } from 'lucide-react'
+import { gerarPixCopiaCola } from '@/lib/pix'
+import QRCodeSVG from '@/components/QRCodeSVG'
+import { ArrowLeft, Download, Lock, Check, X, ShoppingCart, Plus, Minus, Copy, QrCode } from 'lucide-react'
 
 interface Props {
   pessoa: Pessoa
@@ -13,12 +15,31 @@ interface Props {
 
 export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: Props) {
   const [fotos, setFotos] = useState<Foto[]>(fotosIniciais)
-  const [fotoSelecionada, setFotoSelecionada] = useState<Foto | null>(null)
+  const [carrinho, setCarrinho] = useState<string[]>([]) // IDs das fotos no carrinho
+  const [mostrarCarrinho, setMostrarCarrinho] = useState(false)
   const [comprando, setComprando] = useState(false)
   const [step, setStep] = useState<'ver' | 'comprar' | 'pago' | 'baixar'>('ver')
   const [email, setEmail] = useState('')
   const [nome, setNome] = useState('')
+  const [pixCopiaCola, setPixCopiaCola] = useState('')
+  const [pixTotal, setPixTotal] = useState(0)
+  const [copiado, setCopiado] = useState(false)
   const [downloadsUsados, setDownloadsUsados] = useState(0)
+
+  const fotosNoCarrinho = fotos.filter(f => carrinho.includes(f.id))
+  const totalCarrinho = fotosNoCarrinho.reduce((acc, f) => acc + pessoa.preco_por_foto, 0)
+
+  function toggleCarrinho(fotoId: string) {
+    setCarrinho(prev =>
+      prev.includes(fotoId)
+        ? prev.filter(id => id !== fotoId)
+        : [...prev, fotoId]
+    )
+  }
+
+  function limparCarrinho() {
+    setCarrinho([])
+  }
 
   useEffect(() => {
     function bloquearContexto(e: MouseEvent) {
@@ -31,29 +52,57 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
     return () => document.removeEventListener('contextmenu', bloquearContexto)
   }, [])
 
-  async function iniciarCompra(foto: Foto) {
-    setFotoSelecionada(foto)
+  async function iniciarCompra() {
+    if (carrinho.length === 0) {
+      alert('Adicione pelo menos uma foto ao carrinho')
+      return
+    }
     setStep('comprar')
   }
 
-  async function finalizarCompra() {
-    if (!fotoSelecionada || !email || !nome) {
-      alert('Preencha todos os campos')
+  async function gerarPagamentoPix() {
+    if (!email || !nome) {
+      alert('Preencha nome e email')
       return
     }
 
     setComprando(true)
 
+    const total = totalCarrinho
+
+    // Gera código PIX
+    const chavePix = 'clickefotos@exemplo.com' // Configurar depois
+    const codigoPix = gerarPixCopiaCola({
+      chave: chavePix,
+      valor: total,
+      nomeRecebedor: 'CLICKEFOTOS',
+      cidade: 'SAO PAULO',
+      txid: `CLI${Date.now().toString().slice(-8)}`,
+      descricao: `Compra de ${carrinho.length} foto(s)`,
+    })
+
+    setPixCopiaCola(codigoPix)
+    setPixTotal(total)
+    setStep('pix')
+    setComprando(false)
+  }
+
+  async function confirmarPagamento() {
+    setComprando(true)
+
     const downloadToken = `${Date.now()}-${Math.random().toString(36).substring(7)}`
 
-    const { error } = await supabase.from('compras').insert([{
-      foto_id: fotoSelecionada.id,
+    // Marca todas as fotos do carrinho como compradas
+    const compras = carrinho.map(fotoId => ({
+      foto_id: fotoId,
       cliente_email: email,
       cliente_nome: nome,
       valor_pago: pessoa.preco_por_foto,
       status: 'pago',
       download_token: downloadToken,
-    }])
+    }))
+
+    const { error } = await supabase.from('compras').insert(compras)
 
     if (error) {
       alert('Erro ao processar compra: ' + error.message)
@@ -61,17 +110,25 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
       return
     }
 
+    // Atualiza status das fotos
     await supabase
       .from('fotos')
       .update({ vendida: true })
-      .eq('id', fotoSelecionada.id)
-
-    setStep('pago')
-    setComprando(false)
+      .in('id', carrinho)
 
     setFotos(fotos.map(f =>
-      f.id === fotoSelecionada.id ? { ...f, vendida: true } : f
+      carrinho.includes(f.id) ? { ...f, vendida: true } : f
     ))
+
+    setStep('pago')
+    setCarrinho([])
+    setComprando(false)
+  }
+
+  function copiarPix() {
+    navigator.clipboard.writeText(pixCopiaCola)
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 2000)
   }
 
   async function baixarHD() {
@@ -111,7 +168,17 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
               {pessoa.turma && ` • ${pessoa.turma}`}
             </p>
           </div>
-          <div className="w-16"></div>
+          <button
+            onClick={() => setMostrarCarrinho(true)}
+            className="relative flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-sm font-semibold"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            {carrinho.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-violet-500 text-white text-xs flex items-center justify-center">
+                {carrinho.length}
+              </span>
+            )}
+          </button>
         </div>
       </nav>
 
@@ -139,10 +206,12 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {fotos.map((foto, idx) => (
+            {fotos.map((foto, idx) => {
+              const noCarrinho = carrinho.includes(foto.id)
+              return (
               <article
                 key={foto.id}
-                className="photo-card glass-strong rounded-3xl overflow-hidden animate-fade-up"
+                className={`photo-card glass-strong rounded-3xl overflow-hidden animate-fade-up transition-all ${noCarrinho ? 'ring-2 ring-violet-500' : ''}`}
                 style={{ animationDelay: `${idx * 0.05}s` }}
               >
                 <div className="relative aspect-[4/3] overflow-hidden bg-black/20 group cursor-pointer"
@@ -158,6 +227,17 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                     <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold bg-green-500/90 text-white">
                       ✓ Comprada
                     </div>
+                  )}
+                  {!foto.vendida && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleCarrinho(foto.id)
+                      }}
+                      className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all ${noCarrinho ? 'bg-violet-500 text-white' : 'bg-black/40 text-white/70 hover:bg-black/60'}`}
+                    >
+                      {noCarrinho ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </button>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 </div>
@@ -175,157 +255,299 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                   <div className="mt-5 pt-4 border-t border-white/5">
                     {foto.vendida ? (
                       <button
-                        onClick={() => iniciarCompra(foto)}
+                        onClick={() => {
+                          setFotoSelecionada(foto)
+                          setStep('baixar')
+                        }}
                         className="w-full py-2.5 rounded-xl glass hover:bg-white/[0.08] font-semibold text-sm flex items-center justify-center gap-2"
                       >
                         <Download className="w-4 h-4" />
                         Baixar novamente
                       </button>
+                    ) : noCarrinho ? (
+                      <button
+                        onClick={() => toggleCarrinho(foto.id)}
+                        className="w-full py-2.5 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 font-semibold text-sm flex items-center justify-center gap-2"
+                      >
+                        <Check className="w-4 h-4" />
+                        No carrinho • R$ {pessoa.preco_por_foto.toFixed(2).replace('.', ',')}
+                      </button>
                     ) : (
                       <button
-                        onClick={() => iniciarCompra(foto)}
-                        className="btn-primary w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+                        onClick={() => toggleCarrinho(foto.id)}
+                        className="w-full py-2.5 rounded-xl glass hover:bg-white/[0.08] font-semibold text-sm flex items-center justify-center gap-2"
                       >
-                        <Lock className="w-4 h-4" />
-                        Comprar HD • R$ {pessoa.preco_por_foto.toFixed(2).replace('.', ',')}
+                        <Plus className="w-4 h-4" />
+                        Adicionar ao carrinho
                       </button>
                     )}
                   </div>
                 </div>
               </article>
-            ))}
+              )
+            })}
           </div>
         )}
       </main>
 
-      {fotoSelecionada && (
+      {/* Modal do Carrinho + Pagamento */}
+      {mostrarCarrinho && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-up"
           onClick={() => {
-            setFotoSelecionada(null)
+            if (step === 'pix') return // não fecha enquanto espera pagamento
+            setMostrarCarrinho(false)
             setStep('ver')
-            setEmail('')
-            setNome('')
           }}
         >
           <div
             className="glass-strong rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative aspect-[4/3] bg-black/20 select-none">
-              <img
-                src={fotoSelecionada.url}
-                alt={fotoSelecionada.titulo}
-                className="w-full h-full object-cover rounded-t-3xl pointer-events-none"
-                draggable={false}
-                onContextMenu={(e) => e.preventDefault()}
-              />
-              <button
-                onClick={() => {
-                  setFotoSelecionada(null)
-                  setStep('ver')
-                }}
-                className="absolute top-3 right-3 w-10 h-10 rounded-full glass-strong flex items-center justify-center hover:bg-white/[0.1]"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
             <div className="p-6">
-              {step === 'comprar' && (
+              {step === 'ver' && (
                 <>
-                  <h3 className="text-xl font-bold mb-2">Comprar foto em HD</h3>
-                  <p className="text-sm text-white/60 mb-6">
-                    {fotoSelecionada.titulo} • R$ {pessoa.preco_por_foto.toFixed(2).replace('.', ',')}
-                  </p>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                        Seu nome
-                      </label>
-                      <input
-                        type="text"
-                        value={nome}
-                        onChange={(e) => setNome(e.target.value)}
-                        placeholder="Ex: João Silva"
-                        className="w-full px-4 py-3 rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                        Seu email
-                      </label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="seu@email.com"
-                        className="w-full px-4 py-3 rounded-xl"
-                      />
-                      <p className="text-xs text-white/40 mt-2">
-                        Para receber o link de download
-                      </p>
-                    </div>
-
-                    <div className="glass rounded-xl p-4 text-sm">
-                      <p className="text-white/70">
-                        💡 <strong>Demo:</strong> nesta versão de teste o pagamento é simulado.
-                        Em produção, será integrado com Stripe ou MercadoPago.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={finalizarCompra}
-                      disabled={comprando || !email || !nome}
-                      className="btn-primary w-full py-4 rounded-xl font-semibold disabled:opacity-50"
-                    >
-                      {comprando ? 'Processando...' : `Pagar R$ ${pessoa.preco_por_foto.toFixed(2).replace('.', ',')}`}
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <ShoppingCart className="w-5 h-5" />
+                      Seu carrinho
+                    </h3>
+                    <button onClick={() => setMostrarCarrinho(false)} className="w-8 h-8 rounded-full glass flex items-center justify-center">
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
+
+                  {fotosNoCarrinho.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="text-5xl mb-3 opacity-50">🛒</div>
+                      <p className="text-white/60">Carrinho vazio</p>
+                      <p className="text-xs text-white/40 mt-2">Adicione fotos clicando no + nas fotos</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-3 mb-6">
+                        {fotosNoCarrinho.map(foto => (
+                          <div key={foto.id} className="flex items-center gap-3 glass rounded-xl p-3">
+                            <img src={foto.url} className="w-16 h-16 rounded-lg object-cover" />
+                            <div className="flex-1">
+                              <div className="font-semibold text-sm">{foto.titulo}</div>
+                              <div className="text-xs text-white/50">R$ {pessoa.preco_por_foto.toFixed(2).replace('.', ',')}</div>
+                            </div>
+                            <button onClick={() => toggleCarrinho(foto.id)} className="text-red-400 hover:text-red-300">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="border-t border-white/10 pt-4 mb-6">
+                        <div className="flex justify-between items-center text-lg font-bold">
+                          <span>Total</span>
+                          <span>R$ {totalCarrinho.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
+                            Seu nome
+                          </label>
+                          <input
+                            type="text"
+                            value={nome}
+                            onChange={(e) => setNome(e.target.value)}
+                            placeholder="Ex: João Silva"
+                            className="w-full px-4 py-3 rounded-xl"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
+                            Seu email
+                          </label>
+                          <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="seu@email.com"
+                            className="w-full px-4 py-3 rounded-xl"
+                          />
+                          <p className="text-xs text-white/40 mt-2">Para receber o link de download</p>
+                        </div>
+
+                        <button
+                          onClick={gerarPagamentoPix}
+                          disabled={comprando || !email || !nome}
+                          className="btn-primary w-full py-4 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          <QrCode className="w-5 h-5" />
+                          {comprando ? 'Gerando...' : `Pagar com PIX • R$ ${totalCarrinho.toFixed(2).replace('.', ',')}`}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
-              {step === 'pago' && (
-                <div className="text-center">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center mb-4">
-                    <Check className="w-8 h-8 text-green-400" />
+              {step === 'pix' && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <QrCode className="w-5 h-5 text-green-400" />
+                      Pagar com PIX
+                    </h3>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">Pagamento aprovado!</h3>
-                  <p className="text-sm text-white/60 mb-6">
-                    Você tem direito a 3 downloads desta foto.
+
+                  <div className="text-center mb-4">
+                    <div className="text-3xl font-black gradient-text mb-1">
+                      R$ {pixTotal.toFixed(2).replace('.', ',')}
+                    </div>
+                    <div className="text-sm text-white/60">{fotosNoCarrinho.length} {fotosNoCarrinho.length === 1 ? 'foto' : 'fotos'}</div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl mx-auto max-w-xs mb-4">
+                    <QRCodeSVG value={pixCopiaCola} size={256} />
+                  </div>
+
+                  <p className="text-xs text-white/50 text-center mb-3">
+                    Escaneie o QR Code com o app do seu banco
                   </p>
-                  <button
-                    onClick={baixarHD}
-                    disabled={downloadsUsados >= 3}
-                    className="btn-primary w-full py-4 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    <Download className="w-5 h-5" />
-                    {downloadsUsados >= 3 ? 'Limite atingido' : `Baixar HD (${3 - downloadsUsados}/3 restantes)`}
-                  </button>
+
+                  <div className="glass rounded-xl p-3 mb-4">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
+                      PIX Copia e Cola
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={pixCopiaCola}
+                        readOnly
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                        className="flex-1 px-3 py-2 rounded-lg font-mono text-xs"
+                      />
+                      <button
+                        onClick={copiarPix}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 transition-colors"
+                      >
+                        {copiado ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 text-xs text-yellow-200/80 mb-4">
+                    ⚠️ <strong>Demo:</strong> após o pagamento real, clique em "Já paguei" pra liberar as fotos.
+                    Em produção, isso será automático via webhook do banco.
+                  </div>
+
+                  <div className="space-y-2">
+                    <button
+                      onClick={confirmarPagamento}
+                      disabled={comprando}
+                      className="btn-primary w-full py-4 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <Check className="w-5 h-5" />
+                      {comprando ? 'Liberando...' : 'Já paguei — liberar fotos'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setStep('ver')
+                        setPixCopiaCola('')
+                      }}
+                      className="w-full py-2.5 rounded-xl glass hover:bg-white/[0.08] text-sm"
+                    >
+                      Voltar
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {step === 'baixar' && (
-                <div className="text-center">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-cyan-500/20 flex items-center justify-center mb-4">
-                    <Download className="w-8 h-8 text-cyan-400" />
+              {step === 'pago' && (
+                <div className="text-center py-6">
+                  <div className="w-20 h-20 mx-auto rounded-full bg-green-500/20 flex items-center justify-center mb-4">
+                    <Check className="w-10 h-10 text-green-400" />
                   </div>
-                  <h3 className="text-xl font-bold mb-2">Download iniciado!</h3>
+                  <h3 className="text-2xl font-bold mb-2">Pagamento confirmado!</h3>
                   <p className="text-sm text-white/60 mb-6">
-                    Seu download começou. Você ainda tem {3 - downloadsUsados} downloads restantes.
+                    {carrinho.length === 0 ? `${fotos.filter(f => f.vendida).length}` : carrinho.length} foto(s) liberadas para download
                   </p>
+
+                  <div className="space-y-3 mb-6">
+                    {fotos.filter(f => f.vendida).slice(-10).map(foto => (
+                      <div key={foto.id} className="flex items-center gap-3 glass rounded-xl p-3 text-left">
+                        <img src={foto.url} className="w-12 h-12 rounded-lg object-cover" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm truncate">{foto.titulo}</div>
+                          <div className="text-xs text-green-400">✓ Disponível</div>
+                        </div>
+                        <a
+                          href={foto.url_hd}
+                          download={`clickefotos-${foto.titulo}.jpg`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+
                   <button
                     onClick={() => {
-                      setFotoSelecionada(null)
+                      setMostrarCarrinho(false)
                       setStep('ver')
-                      setDownloadsUsados(0)
                     }}
                     className="w-full py-3 rounded-xl glass hover:bg-white/[0.08] font-semibold"
                   >
                     Fechar
                   </button>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de visualização de foto (sem compra) */}
+      {fotoSelecionada && step !== 'pix' && step !== 'pago' && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-up"
+          onClick={() => setFotoSelecionada(null)}
+        >
+          <div
+            className="glass-strong rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative bg-black/20 select-none">
+              <img
+                src={fotoSelecionada.url}
+                alt={fotoSelecionada.titulo}
+                className="w-full max-h-[70vh] object-contain pointer-events-none"
+                draggable={false}
+                onContextMenu={(e) => e.preventDefault()}
+              />
+              <button
+                onClick={() => setFotoSelecionada(null)}
+                className="absolute top-3 right-3 w-10 h-10 rounded-full glass-strong flex items-center justify-center hover:bg-white/[0.1]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <h3 className="font-bold text-lg mb-1">{fotoSelecionada.titulo}</h3>
+              {fotoSelecionada.descricao && (
+                <p className="text-sm text-white/60">{fotoSelecionada.descricao}</p>
+              )}
+              {fotoSelecionada.vendida && (
+                <a
+                  href={fotoSelecionada.url_hd}
+                  download={`clickefotos-${fotoSelecionada.titulo}.jpg`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary mt-4 w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Baixar HD
+                </a>
               )}
             </div>
           </div>

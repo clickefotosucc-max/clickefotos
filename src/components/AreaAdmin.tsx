@@ -35,6 +35,23 @@ export default function AreaAdmin({ onVoltar }: Props) {
     carregarPessoas()
   }, [])
 
+  const [mostrarConfig, setMostrarConfig] = useState(false)
+  const [chavePix, setChavePix] = useState('')
+
+  useEffect(() => {
+    const configSalva = localStorage.getItem('clickefotos-config')
+    if (configSalva) {
+      const config = JSON.parse(configSalva)
+      setChavePix(config.chavePix || '')
+    }
+  }, [])
+
+  function salvarConfig() {
+    localStorage.setItem('clickefotos-config', JSON.stringify({ chavePix }))
+    setMostrarConfig(false)
+    alert('Configurações salvas!')
+  }
+
   async function carregarPessoas() {
     const { data, error } = await supabase
       .from('pessoas')
@@ -229,6 +246,12 @@ export default function AreaAdmin({ onVoltar }: Props) {
                 <User className="w-4 h-4" />
               </div>
               <span className="font-bold">Painel do Organizador</span>
+              <button
+                onClick={() => setMostrarConfig(true)}
+                className="px-3 py-1.5 rounded-lg glass text-xs hover:bg-white/[0.08]"
+              >
+                ⚙️ PIX
+              </button>
             </div>
             <div className="w-24"></div>
           </div>
@@ -365,6 +388,56 @@ export default function AreaAdmin({ onVoltar }: Props) {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {mostrarConfig && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            onClick={() => setMostrarConfig(false)}
+          >
+            <div
+              className="glass-strong rounded-3xl max-w-md w-full p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-bold mb-2">⚙️ Configurações PIX</h3>
+              <p className="text-sm text-white/60 mb-4">
+                Sua chave PIX será usada para receber os pagamentos das compras de fotos.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
+                    Chave PIX
+                  </label>
+                  <input
+                    type="text"
+                    value={chavePix}
+                    onChange={(e) => setChavePix(e.target.value)}
+                    placeholder="email@exemplo.com, CPF, CNPJ, celular ou chave aleatória"
+                    className="w-full px-4 py-3 rounded-xl"
+                  />
+                  <p className="text-xs text-white/40 mt-2">
+                    Pode ser: email, CPF/CNPJ, telefone ou chave aleatória
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMostrarConfig(false)}
+                    className="flex-1 py-3 rounded-xl glass hover:bg-white/[0.08] font-semibold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={salvarConfig}
+                    className="flex-1 btn-primary py-3 rounded-xl font-semibold"
+                  >
+                    Salvar
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

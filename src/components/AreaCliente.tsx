@@ -70,8 +70,17 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
 
     const total = totalCarrinho
 
+    // Lê chave PIX do localStorage (configurada pelo admin)
+    const configSalva = localStorage.getItem('clickefotos-config')
+    let chavePix = 'clickefotos@exemplo.com' // fallback se não configurado
+    if (configSalva) {
+      try {
+        const config = JSON.parse(configSalva)
+        if (config.chavePix) chavePix = config.chavePix
+      } catch {}
+    }
+
     // Gera código PIX
-    const chavePix = 'clickefotos@exemplo.com' // Configurar depois
     const codigoPix = gerarPixCopiaCola({
       chave: chavePix,
       valor: total,

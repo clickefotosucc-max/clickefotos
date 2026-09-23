@@ -9,7 +9,7 @@ import Header from '@/components/Header'
 import {
   Plus, Upload, Copy, Check, Trash2, Clock, X, Settings, FolderUp,
   LayoutDashboard, CalendarRange, Wallet, Ticket, ChevronRight,
-  MessageCircle, Mail, Hash, Sparkles,
+  MessageCircle, Mail, Hash, Sparkles, Edit,
 } from 'lucide-react'
 
 interface Props {
@@ -41,6 +41,15 @@ export default function AreaAdmin({ onVoltar }: Props) {
   const [progressoUpload, setProgressoUpload] = useState({ atual: 0, total: 0 })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [codigoCopiado, setCodigoCopiado] = useState(false)
+
+  // Estado de edição da pessoa
+  const [showEditarPessoa, setShowEditarPessoa] = useState(false)
+  const [editNome, setEditNome] = useState('')
+  const [editTurma, setEditTurma] = useState('')
+  const [editDescricao, setEditDescricao] = useState('')
+  const [editPreco, setEditPreco] = useState('')
+  const [editTelefone, setEditTelefone] = useState('')
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false)
 
   useEffect(() => {
     carregarPessoas()
@@ -161,6 +170,45 @@ export default function AreaAdmin({ onVoltar }: Props) {
     setShowNovaPessoa(false)
     setNovoNome(''); setNovoTurma(''); setNovoDescricao(''); setNovoPreco('5,00'); setNovoTelefone('')
     await carregarPessoas()
+  }
+
+  function abrirEdicao() {
+    if (!pessoaSelecionada) return
+    setEditNome(pessoaSelecionada.nome)
+    setEditTurma(pessoaSelecionada.turma || '')
+    setEditDescricao(pessoaSelecionada.descricao || '')
+    setEditPreco(pessoaSelecionada.preco_por_foto.toFixed(2).replace('.', ','))
+    setEditTelefone(pessoaSelecionada.telefone || '')
+    setShowEditarPessoa(true)
+  }
+
+  async function salvarEdicao(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editNome.trim()) { alert('Preencha o nome'); return }
+    if (!pessoaSelecionada) return
+
+    setSalvandoEdicao(true)
+    const payload = {
+      nome: editNome.trim(),
+      turma: editTurma.trim() || null,
+      descricao: editDescricao.trim() || null,
+      preco_por_foto: precoParaNumero(editPreco),
+      telefone: editTelefone.trim() || null,
+    }
+    const { error } = await supabase
+      .from('pessoas')
+      .update(payload)
+      .eq('id', pessoaSelecionada.id)
+
+    setSalvandoEdicao(false)
+
+    if (error) { alert('Erro ao salvar: ' + error.message); return }
+
+    const pessoaAtualizada: Pessoa = { ...pessoaSelecionada, ...payload }
+    setPessoaSelecionada(pessoaAtualizada)
+    setPessoas(prev => prev.map(p => p.id === pessoaAtualizada.id ? pessoaAtualizada : p))
+
+    setShowEditarPessoa(false)
   }
 
   function normalizarNome(nome: string): string {
@@ -422,6 +470,90 @@ export default function AreaAdmin({ onVoltar }: Props) {
                 </button>
                 <button type="submit" disabled={criando} className="btn-ink disabled:opacity-40">
                   {criando ? 'Criando…' : 'Criar pessoa'}
+                </button>
+              </div>
+            </form>
+          </ModalSheet>
+        )}
+
+        {/* MODAL: EDITAR PESSOA */}
+        {showEditarPessoa && (
+          <ModalSheet onClose={() => setShowEditarPessoa(false)}>
+            <header className="rule-bottom pb-4 mb-6">
+              <p className="eyebrow mb-2">Edição de cadastro</p>
+              <h2 className="font-display text-2xl font-medium text-ink">Editar pessoa</h2>
+              <p className="text-ink-soft text-sm mt-1">
+                Altere os dados do participante. O código permanece inalterado.
+              </p>
+            </header>
+
+            <form onSubmit={salvarEdicao} className="space-y-6">
+              <FormField label="Nome completo *" htmlFor="edit-nome">
+                <input
+                  id="edit-nome"
+                  type="text"
+                  value={editNome}
+                  onChange={(e) => setEditNome(e.target.value)}
+                  placeholder="Ex: Lucas Emanuel da Silva"
+                  className="input-editorial"
+                  required
+                />
+              </FormField>
+
+              <FormField label="Turma" htmlFor="edit-turma">
+                <input
+                  id="edit-turma"
+                  type="text"
+                  value={editTurma}
+                  onChange={(e) => setEditTurma(e.target.value)}
+                  placeholder="Ex: 3º Ano A"
+                  className="input-editorial"
+                />
+              </FormField>
+
+              <FormField label="Descrição (opcional)" htmlFor="edit-desc">
+                <input
+                  id="edit-desc"
+                  type="text"
+                  value={editDescricao}
+                  onChange={(e) => setEditDescricao(e.target.value)}
+                  placeholder="Ex: Participante da feira"
+                  className="input-editorial"
+                />
+              </FormField>
+
+              <FormField label="Telefone (opcional)" htmlFor="edit-telefone">
+                <input
+                  id="edit-telefone"
+                  type="tel"
+                  inputMode="tel"
+                  value={editTelefone}
+                  onChange={(e) => setEditTelefone(e.target.value)}
+                  placeholder="(11) 99999-9999"
+                  className="input-editorial"
+                />
+                <p className="text-xs text-ink-soft mt-2">Usado para enviar o link de resgate pelo WhatsApp.</p>
+              </FormField>
+
+              <FormField label="Preço por foto (R$)" htmlFor="edit-preco">
+                <input
+                  id="edit-preco"
+                  type="text"
+                  inputMode="decimal"
+                  value={editPreco}
+                  onChange={(e) => setEditPreco(formatarPreco(e.target.value))}
+                  placeholder="0,00"
+                  className="input-editorial font-mono"
+                />
+                <p className="text-xs text-ink-soft mt-2">Use vírgula para centavos (ex: 5,00).</p>
+              </FormField>
+
+              <div className="flex items-center gap-4 pt-2">
+                <button type="button" onClick={() => setShowEditarPessoa(false)} className="btn-ghost-editorial">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={salvandoEdicao} className="btn-ink disabled:opacity-40">
+                  {salvandoEdicao ? 'Salvando…' : 'Salvar alterações'}
                 </button>
               </div>
             </form>
@@ -831,6 +963,13 @@ export default function AreaAdmin({ onVoltar }: Props) {
                   )}
                 </div>
               </div>
+              <button
+                onClick={abrirEdicao}
+                className="btn-line w-full !justify-center text-sm mt-3"
+              >
+                <Edit className="w-3.5 h-3.5" />
+                Editar cadastro
+              </button>
             </SidebarCard>
 
             <SidebarCard titulo="Código Direto" eyebrow="RESGATE">

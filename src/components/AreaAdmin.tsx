@@ -476,90 +476,6 @@ export default function AreaAdmin({ onVoltar }: Props) {
           </ModalSheet>
         )}
 
-        {/* MODAL: EDITAR PESSOA */}
-        {showEditarPessoa && (
-          <ModalSheet onClose={() => setShowEditarPessoa(false)}>
-            <header className="rule-bottom pb-4 mb-6">
-              <p className="eyebrow mb-2">Edição de cadastro</p>
-              <h2 className="font-display text-2xl font-medium text-ink">Editar pessoa</h2>
-              <p className="text-ink-soft text-sm mt-1">
-                Altere os dados do participante. O código permanece inalterado.
-              </p>
-            </header>
-
-            <form onSubmit={salvarEdicao} className="space-y-6">
-              <FormField label="Nome completo *" htmlFor="edit-nome">
-                <input
-                  id="edit-nome"
-                  type="text"
-                  value={editNome}
-                  onChange={(e) => setEditNome(e.target.value)}
-                  placeholder="Ex: Lucas Emanuel da Silva"
-                  className="input-editorial"
-                  required
-                />
-              </FormField>
-
-              <FormField label="Turma" htmlFor="edit-turma">
-                <input
-                  id="edit-turma"
-                  type="text"
-                  value={editTurma}
-                  onChange={(e) => setEditTurma(e.target.value)}
-                  placeholder="Ex: 3º Ano A"
-                  className="input-editorial"
-                />
-              </FormField>
-
-              <FormField label="Descrição (opcional)" htmlFor="edit-desc">
-                <input
-                  id="edit-desc"
-                  type="text"
-                  value={editDescricao}
-                  onChange={(e) => setEditDescricao(e.target.value)}
-                  placeholder="Ex: Participante da feira"
-                  className="input-editorial"
-                />
-              </FormField>
-
-              <FormField label="Telefone (opcional)" htmlFor="edit-telefone">
-                <input
-                  id="edit-telefone"
-                  type="tel"
-                  inputMode="tel"
-                  value={editTelefone}
-                  onChange={(e) => setEditTelefone(e.target.value)}
-                  placeholder="(11) 99999-9999"
-                  className="input-editorial"
-                />
-                <p className="text-xs text-ink-soft mt-2">Usado para enviar o link de resgate pelo WhatsApp.</p>
-              </FormField>
-
-              <FormField label="Preço por foto (R$)" htmlFor="edit-preco">
-                <input
-                  id="edit-preco"
-                  type="text"
-                  inputMode="decimal"
-                  value={editPreco}
-                  onChange={(e) => setEditPreco(formatarPreco(e.target.value))}
-                  placeholder="0,00"
-                  className="input-editorial font-mono"
-                />
-                <p className="text-xs text-ink-soft mt-2">Use vírgula para centavos (ex: 5,00).</p>
-              </FormField>
-
-              <div className="flex items-center gap-4 pt-2">
-                <button type="button" onClick={() => setShowEditarPessoa(false)} className="btn-ghost-editorial">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={salvandoEdicao} className="btn-ink disabled:opacity-40">
-                  {salvandoEdicao ? 'Salvando…' : 'Salvar alterações'}
-                </button>
-              </div>
-            </form>
-          </ModalSheet>
-        )}
-
         {/* MODAL: PENDENTES */}
         {mostrarPendentes && (
           <ModalSheet size="lg" onClose={() => setMostrarPendentes(false)}>
@@ -1049,6 +965,90 @@ export default function AreaAdmin({ onVoltar }: Props) {
           </aside>
         </div>
       </main>
+
+      {/* MODAL: EDITAR PESSOA */}
+      {showEditarPessoa && (
+        <ModalSheet onClose={() => setShowEditarPessoa(false)}>
+          <header className="rule-bottom pb-4 mb-6">
+            <p className="eyebrow mb-2">Edição de cadastro</p>
+            <h2 className="font-display text-2xl font-medium text-ink">Editar pessoa</h2>
+            <p className="text-ink-soft text-sm mt-1">
+              Altere os dados do participante. O código permanece inalterado.
+            </p>
+          </header>
+
+          <form onSubmit={salvarEdicao} className="space-y-6">
+            <FormField label="Nome completo *" htmlFor="edit-nome">
+              <input
+                id="edit-nome"
+                type="text"
+                value={editNome}
+                onChange={(e) => setEditNome(e.target.value)}
+                placeholder="Ex: Lucas Emanuel da Silva"
+                className="input-editorial"
+                required
+              />
+            </FormField>
+
+            <FormField label="Turma" htmlFor="edit-turma">
+              <input
+                id="edit-turma"
+                type="text"
+                value={editTurma}
+                onChange={(e) => setEditTurma(e.target.value)}
+                placeholder="Ex: 3º Ano A"
+                className="input-editorial"
+              />
+            </FormField>
+
+            <FormField label="Descrição (opcional)" htmlFor="edit-desc">
+              <input
+                id="edit-desc"
+                type="text"
+                value={editDescricao}
+                onChange={(e) => setEditDescricao(e.target.value)}
+                placeholder="Ex: Participante da feira"
+                className="input-editorial"
+              />
+            </FormField>
+
+            <FormField label="Telefone (opcional)" htmlFor="edit-telefone">
+              <input
+                id="edit-telefone"
+                type="tel"
+                inputMode="tel"
+                value={editTelefone}
+                onChange={(e) => setEditTelefone(e.target.value)}
+                placeholder="(11) 99999-9999"
+                className="input-editorial"
+              />
+              <p className="text-xs text-ink-soft mt-2">Usado para enviar o link de resgate pelo WhatsApp.</p>
+            </FormField>
+
+            <FormField label="Preço por foto (R$)" htmlFor="edit-preco">
+              <input
+                id="edit-preco"
+                type="text"
+                inputMode="decimal"
+                value={editPreco}
+                onChange={(e) => setEditPreco(formatarPreco(e.target.value))}
+                placeholder="0,00"
+                className="input-editorial font-mono"
+              />
+              <p className="text-xs text-ink-soft mt-2">Use vírgula para centavos (ex: 5,00).</p>
+            </FormField>
+
+            <div className="flex items-center gap-4 pt-2">
+              <button type="button" onClick={() => setShowEditarPessoa(false)} className="btn-ghost-editorial">
+                Cancelar
+              </button>
+              <button type="submit" disabled={salvandoEdicao} className="btn-ink disabled:opacity-40">
+                {salvandoEdicao ? 'Salvando…' : 'Salvar alterações'}
+              </button>
+            </div>
+          </form>
+        </ModalSheet>
+      )}
     </div>
   )
 }

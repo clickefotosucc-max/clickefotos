@@ -4,17 +4,26 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Foto, Pessoa } from '@/types'
 import { aplicarMarcaDagua } from '@/lib/watermark'
-import { ArrowLeft, Plus, Upload, Copy, Check, Trash2, User, Clock, Mail } from 'lucide-react'
+import { gerarLinkWhatsApp } from '@/lib/whatsapp'
+import Header from '@/components/Header'
+import {
+  Plus, Upload, Copy, Check, Trash2, Clock, X, Settings, FolderUp,
+  LayoutDashboard, CalendarRange, Wallet, Ticket, ChevronRight,
+  MessageCircle, Mail, Hash, Sparkles,
+} from 'lucide-react'
 
 interface Props {
   onVoltar: () => void
 }
+
+type Section = 'overview' | 'eventos' | 'vendas' | 'cupons'
 
 export default function AreaAdmin({ onVoltar }: Props) {
   const [pessoas, setPessoas] = useState<Pessoa[]>([])
   const [pessoaSelecionada, setPessoaSelecionada] = useState<Pessoa | null>(null)
   const [fotosPessoa, setFotosPessoa] = useState<Foto[]>([])
   const [loading, setLoading] = useState(true)
+  const [section, setSection] = useState<Section>('overview')
 
   const [showNovaPessoa, setShowNovaPessoa] = useState(false)
   const [novoNome, setNovoNome] = useState('')
@@ -66,34 +75,25 @@ export default function AreaAdmin({ onVoltar }: Props) {
       .select('*, foto:fotos(titulo, pessoa_id)')
       .eq('status', 'pendente')
       .order('created_at', { ascending: false })
-
     setComprasPendentes(data || [])
   }
 
   async function liberarCompra(compra: any) {
-    // Marca a compra como paga
     await supabase
       .from('compras')
       .update({ status: 'pago' })
       .eq('id', compra.id)
-
-    // Marca a foto como vendida
     await supabase
       .from('fotos')
       .update({ vendida: true })
       .eq('id', compra.foto_id)
-
-    // Recarrega
     await carregarComprasPendentes()
-    alert(`✅ Foto liberada para ${compra.cliente_nome} (${compra.cliente_email})`)
+    alert(`Foto liberada para ${compra.cliente_nome} (${compra.cliente_email})`)
   }
 
   async function rejeitarCompra(compra: any) {
     if (!confirm(`Rejeitar compra de ${compra.cliente_nome}?`)) return
-    await supabase
-      .from('compras')
-      .delete()
-      .eq('id', compra.id)
+    await supabase.from('compras').delete().eq('id', compra.id)
     await carregarComprasPendentes()
   }
 
@@ -102,16 +102,12 @@ export default function AreaAdmin({ onVoltar }: Props) {
       .from('pessoas')
       .select('*')
       .order('created_at', { ascending: false })
-
-    if (!error && data) {
-      setPessoas(data)
-    }
+    if (!error && data) setPessoas(data)
     setLoading(false)
   }
 
   async function carregarFotosPessoa(pessoa: Pessoa) {
     setPessoaSelecionada(pessoa)
-    // Limpa estado de upload quando troca de pessoa
     setArquivos([])
     setPreviewsUrls([])
     setTitulo('')
@@ -122,142 +118,75 @@ export default function AreaAdmin({ onVoltar }: Props) {
       .select('*')
       .eq('pessoa_id', pessoa.id)
       .order('created_at', { ascending: false })
-
-    if (!error && data) {
-      setFotosPessoa(data)
-    }
+    if (!error && data) setFotosPessoa(data)
   }
 
   function formatarPreco(valor: string): string {
-    // Remove tudo que não é número
     const nums = valor.replace(/\D/g, '')
-    // Converte para número e divide por 100 (pra ter casas decimais)
     const num = parseInt(nums || '0') / 100
-    // Retorna com 2 casas decimais usando vírgula
     return num.toFixed(2).replace('.', ',')
   }
 
   function precoParaNumero(valorFormatado: string): number {
-    // "5,00" -> 5.00
     return parseFloat(valorFormatado.replace(',', '.'))
   }
 
   async function criarPessoa(e: React.FormEvent) {
     e.preventDefault()
-    if (!novoNome) {
-      alert('Preencha o nome')
-      return
-    }
-
+    if (!novoNome) { alert('Preencha o nome'); return }
     setCriando(true)
-
-    // Gerar código único
     let codigo = ''
     for (let i = 0; i < 10; i++) {
       const tentativa = Math.random().toString(36).substring(2, 5).toUpperCase() + '-' +
-                       Math.random().toString(36).substring(2, 5).toUpperCase()
-
+        Math.random().toString(36).substring(2, 5).toUpperCase()
       const { data: existe } = await supabase
         .from('pessoas')
         .select('id')
         .eq('codigo', tentativa)
         .single()
-
-      if (!existe) {
-        codigo = tentativa
-        break
-      }
+      if (!existe) { codigo = tentativa; break }
     }
-
-    if (!codigo) {
-      alert('Não foi possível gerar código único')
-      setCriando(false)
-      return
-    }
+    if (!codigo) { alert('Não foi possível gerar código único'); setCriando(false); return }
 
     const { error } = await supabase.from('pessoas').insert([{
-      codigo,
-      nome: novoNome,
-      turma: novoTurma || null,
-      descricao: novoDescricao || null,
+      codigo, nome: novoNome,
+      turma: novoTurma || null, descricao: novoDescricao || null,
       preco_por_foto: precoParaNumero(novoPreco),
     }])
-
     setCriando(false)
-
-    if (error) {
-      alert('Erro ao criar pessoa: ' + error.message)
-      return
-    }
+    if (error) { alert('Erro ao criar pessoa: ' + error.message); return }
 
     setShowNovaPessoa(false)
-    setNovoNome('')
-    setNovoTurma('')
-    setNovoDescricao('')
-    setNovoPreco('5.00')
+    setNovoNome(''); setNovoTurma(''); setNovoDescricao(''); setNovoPreco('5,00')
     await carregarPessoas()
   }
 
-  // Helper: remove acentos e espaços
   function normalizarNome(nome: string): string {
-    return nome
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '') // remove acentos
-      .replace(/\s+/g, '') // remove espaços
+    return nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '')
   }
-
-  // Gera próximo título no formato "NomeSequencial_001"
   function gerarProximoTitulo(): string {
     if (!pessoaSelecionada) return ''
-    const nomeBase = normalizarNome(pessoaSelecionada.nome)
-    const proximoNumero = fotosPessoa.length + 1
-    return `${nomeBase}_${proximoNumero.toString().padStart(3, '0')}`
+    return `${normalizarNome(pessoaSelecionada.nome)}_${(fotosPessoa.length + 1).toString().padStart(3, '0')}`
   }
-
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
-
-    // Libera URLs antigas pra evitar memory leak
-    setPreviewsUrls(prev => {
-      prev.forEach(url => URL.revokeObjectURL(url))
-      return []
-    })
-
-    // Filtra só imagens
+    setPreviewsUrls(prev => { prev.forEach(url => URL.revokeObjectURL(url)); return [] })
     const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'))
-    if (imageFiles.length === 0) {
-      alert('Nenhuma imagem válida selecionada')
-      return
-    }
-
+    if (imageFiles.length === 0) { alert('Nenhuma imagem válida selecionada'); return }
     setArquivos(imageFiles)
-
-    // Gera previews
-    const urls = imageFiles.map(f => URL.createObjectURL(f))
-    setPreviewsUrls(urls)
-
-    // Sugere título automaticamente se estiver vazio
-    if (!titulo) {
-      setTitulo(gerarProximoTitulo())
-    }
+    setPreviewsUrls(imageFiles.map(f => URL.createObjectURL(f)))
+    if (!titulo) setTitulo(gerarProximoTitulo())
   }
-
   function handleDrop(e: React.DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault(); e.stopPropagation()
     handleFiles(e.dataTransfer.files)
   }
-
   function handleDragOver(e: React.DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault(); e.stopPropagation()
   }
-
   function handleDiretorio() {
-    // Cria input escondido com suporte a pasta
     const input = document.createElement('input')
-    input.type = 'file'
-    input.multiple = true
+    input.type = 'file'; input.multiple = true
     // @ts-ignore
     input.webkitdirectory = true
     // @ts-ignore
@@ -266,82 +195,42 @@ export default function AreaAdmin({ onVoltar }: Props) {
     input.onchange = (e: any) => handleFiles(e.target.files)
     input.click()
   }
-
   async function handleUploadFoto(e: React.FormEvent) {
     e.preventDefault()
-    if (!pessoaSelecionada || arquivos.length === 0) {
-      alert('Selecione pelo menos uma imagem')
-      return
-    }
-
+    if (!pessoaSelecionada || arquivos.length === 0) { alert('Selecione pelo menos uma imagem'); return }
     setUploading(true)
     setProgressoUpload({ atual: 0, total: arquivos.length })
-
     try {
-      // Lê chave PIX e WhatsApp pra salvar no metadata da compra
-      const configSalva = localStorage.getItem('clickefotos-config')
-
       for (let i = 0; i < arquivos.length; i++) {
         const arquivo = arquivos[i]
         setProgressoUpload({ atual: i + 1, total: arquivos.length })
-
-        // Gera título individual: Nome_001, Nome_002...
         const numeroFoto = fotosPessoa.length + i + 1
         const tituloFoto = `${normalizarNome(pessoaSelecionada.nome)}_${numeroFoto.toString().padStart(3, '0')}`
-
-        // Aplica marca d'água na imagem de preview
         const previewBlob = await aplicarMarcaDagua(arquivo, 'CLICKEFOTOS')
         const previewFile = new File([previewBlob], `preview-${arquivo.name}`, { type: arquivo.type })
-
         const nomeBase = `${pessoaSelecionada.codigo}-${Date.now()}-${i}`
 
-        // Upload da foto ORIGINAL em alta resolução (HD) - SEM marca d'água
-        const { error: uploadHDError } = await supabase.storage
-          .from('fotos-hd')
-          .upload(`${nomeBase}-hd`, arquivo)
-
+        const { error: uploadHDError } = await supabase.storage.from('fotos-hd').upload(`${nomeBase}-hd`, arquivo)
         if (uploadHDError) throw new Error(`Erro no upload HD da foto ${i + 1}: ` + uploadHDError.message)
+        const { data: urlHDData } = supabase.storage.from('fotos-hd').getPublicUrl(`${nomeBase}-hd`)
 
-        const { data: urlHDData } = supabase.storage
-          .from('fotos-hd')
-          .getPublicUrl(`${nomeBase}-hd`)
-
-        // Upload da versão COM marca d'água (preview público)
-        const { error: uploadPreviewError } = await supabase.storage
-          .from('fotos')
-          .upload(`${nomeBase}-preview`, previewFile)
-
+        const { error: uploadPreviewError } = await supabase.storage.from('fotos').upload(`${nomeBase}-preview`, previewFile)
         if (uploadPreviewError) throw new Error(`Erro no upload preview da foto ${i + 1}: ` + uploadPreviewError.message)
-
-        const { data: urlPreviewData } = supabase.storage
-          .from('fotos')
-          .getPublicUrl(`${nomeBase}-preview`)
+        const { data: urlPreviewData } = supabase.storage.from('fotos').getPublicUrl(`${nomeBase}-preview`)
 
         const { error: insertError } = await supabase.from('fotos').insert([{
-          pessoa_id: pessoaSelecionada.id,
-          titulo: tituloFoto,
+          pessoa_id: pessoaSelecionada.id, titulo: tituloFoto,
           descricao: descricao || null,
-          url: urlPreviewData.publicUrl,
-          url_hd: urlHDData.publicUrl,
+          url: urlPreviewData.publicUrl, url_hd: urlHDData.publicUrl,
         }])
-
         if (insertError) throw new Error('Erro ao salvar foto ' + (i + 1) + ': ' + insertError.message)
       }
-
-      // Limpa tudo
-      setTitulo('')
-      setDescricao('')
-      setArquivos([])
-      setPreviewsUrls([])
+      setTitulo(''); setDescricao(''); setArquivos([]); setPreviewsUrls([])
       if (fileInputRef.current) fileInputRef.current.value = ''
-
       await carregarFotosPessoa(pessoaSelecionada)
-      alert(`✅ ${arquivos.length} foto(s) enviada(s) com sucesso!`)
-    } catch (err: any) {
-      alert(err.message || 'Erro ao processar fotos')
-    } finally {
-      setUploading(false)
-    }
+      alert(`${arquivos.length} foto(s) enviada(s) com sucesso!`)
+    } catch (err: any) { alert(err.message || 'Erro ao processar fotos') }
+    finally { setUploading(false) }
   }
 
   async function deletarFoto(foto: Foto) {
@@ -356,468 +245,746 @@ export default function AreaAdmin({ onVoltar }: Props) {
     setTimeout(() => setCodigoCopiado(false), 2000)
   }
 
-  // VIEW: Lista de pessoas
-  if (!pessoaSelecionada) {
+  const navItems = [
+    { label: 'Resgatar Fotos', onClick: onVoltar },
+    { label: 'Minha Galeria' },
+    { label: 'Painel do Fotógrafo', active: true },
+  ]
+
+  /* ---------- LISTA DE PESSOAS (Visão Geral) ---------- */
+  if (!pessoaSelecionada && section === 'overview') {
     return (
-      <div className="min-h-screen text-white">
-        <nav className="sticky top-0 z-50 surface-nav">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <button onClick={onVoltar} className="flex items-center gap-2 text-sm text-white/60 hover:text-white">
-              <ArrowLeft className="w-4 h-4" />
-              Voltar ao site
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                <User className="w-4 h-4" />
+      <div className="min-h-screen flex flex-col">
+        <Header
+          variant="admin"
+          onVoltar={onVoltar}
+          navItems={navItems}
+          badgeEvento={`${pessoas.length} participantes cadastrados`}
+        />
+
+        <div className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-10 grid lg:grid-cols-[240px_1fr] gap-8">
+          {/* SIDEBAR ESQUERDA */}
+          <aside>
+            <p className="eyebrow mb-3 px-3">PAINEL</p>
+            <nav className="space-y-1">
+              <SidebarItem icon={LayoutDashboard} label="Visão Geral" active onClick={() => setSection('overview')} />
+              <SidebarItem icon={CalendarRange} label="Eventos & Álbuns" onClick={() => setSection('eventos')} />
+              <SidebarItem
+                icon={Wallet} label="Vendas & PIX"
+                onClick={async () => { await carregarComprasPendentes(); setMostrarPendentes(true) }}
+                badge={comprasPendentes.length > 0 ? comprasPendentes.length : undefined}
+              />
+              <SidebarItem icon={Ticket} label="Códigos & Cupons" onClick={() => setSection('cupons')} />
+              <SidebarItem icon={Settings} label="Chave PIX" onClick={() => setMostrarConfig(true)} />
+            </nav>
+
+            <div className="rule pt-6 mt-6">
+              <p className="eyebrow mb-3 px-3">EVENTO ATUAL</p>
+              <div className="card !p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber animate-pulse-dot" />
+                  <span className="text-xs text-ink-soft">EM ANDAMENTO</span>
+                </div>
+                <p className="font-display text-sm text-ink leading-tight">
+                  Feira de Empreendedorismo 2025
+                </p>
+                <p className="text-xs text-ink-soft mt-1">Estúdio Acreditar</p>
               </div>
-              <span className="font-bold">Painel do Organizador</span>
-              <button
-                onClick={async () => {
-                  await carregarComprasPendentes()
-                  setMostrarPendentes(true)
-                }}
-                className="px-3 py-1.5 rounded-lg surface-card hover:bg-slate-800 flex items-center gap-1"
-              >
-                <Clock className="w-3 h-3" />
-                Pendentes
-              </button>
-              <button
-                onClick={() => setMostrarConfig(true)}
-                className="px-3 py-1.5 rounded-lg surface-card hover:bg-slate-800"
-              >
-                ⚙️ PIX
-              </button>
             </div>
-            <div className="w-24"></div>
-          </div>
-        </nav>
+          </aside>
 
-        <main className="max-w-7xl mx-auto px-6 py-12">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold">Pessoas cadastradas</h1>
-              <p className="text-white/50 text-sm mt-1">
-                {pessoas.length} {pessoas.length === 1 ? 'pessoa' : 'pessoas'} cadastradas
-              </p>
-            </div>
-            <button
-              onClick={() => setShowNovaPessoa(true)}
-              className="btn-primary text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Nova pessoa
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="text-center py-20">
-              <div className="inline-block w-10 h-10 border-4 border-slate-700/50 rounded-full animate-spin"></div>
-            </div>
-          ) : pessoas.length === 0 ? (
-            <div className="text-center py-20 surface-card rounded-3xl">
-              <div className="text-6xl mb-4">👤</div>
-              <h3 className="text-xl font-bold mb-2">Nenhuma pessoa ainda</h3>
-              <p className="text-white/50 mb-6">Comece cadastrando a primeira pessoa</p>
-              <button
-                onClick={() => setShowNovaPessoa(true)}
-                className="btn-primary"
-              >
-                Cadastrar primeira pessoa
+          {/* CONTEÚDO PRINCIPAL */}
+          <main>
+            <header className="flex items-end justify-between mb-8 rule-bottom pb-6">
+              <div>
+                <p className="eyebrow mb-2">GESTÃO DE PARTICIPANTES</p>
+                <h1 className="font-display text-3xl md:text-4xl font-medium text-ink">
+                  Pessoas
+                </h1>
+                <p className="text-ink-soft mt-2 text-sm">
+                  {pessoas.length} {pessoas.length === 1 ? 'cadastro ativo' : 'cadastros ativos'}
+                </p>
+              </div>
+              <button onClick={() => setShowNovaPessoa(true)} className="btn-amber-pill">
+                <Plus className="w-4 h-4" />
+                Nova pessoa
               </button>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {pessoas.map((pessoa) => (
-                <button
-                  key={pessoa.id}
-                  onClick={() => carregarFotosPessoa(pessoa)}
-                  className="surface-card rounded-2xl p-6 text-left hover:bg-slate-800 transition-all group"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-xl">
-                      👤
-                    </div>
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        copiarCodigo(pessoa.codigo)
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 rounded-md surface-card hover:bg-slate-800 font-mono cursor-pointer"
+            </header>
+
+            {loading ? (
+              <div className="text-center py-20 text-ink-soft">Carregando…</div>
+            ) : pessoas.length === 0 ? (
+              <EmptyStateNova onClick={() => setShowNovaPessoa(true)} />
+            ) : (
+              <ul className="space-y-3">
+                {pessoas.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      onClick={() => carregarFotosPessoa(p)}
+                      className="w-full card !p-4 flex items-center gap-4 hover:border-amber/40 transition-colors text-left group"
                     >
-                      {pessoa.codigo}
-                      {codigoCopiado ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
-                    </div>
-                  </div>
-                  <h3 className="font-bold text-lg leading-tight">{pessoa.nome}</h3>
-                  {pessoa.turma && <p className="text-sm text-white/50 mt-1">{pessoa.turma}</p>}
-                  {pessoa.descricao && (
-                    <p className="text-xs text-white/40 mt-2 line-clamp-2">{pessoa.descricao}</p>
-                  )}
-                  <div className="mt-4 pt-4 border-t border-slate-700/50 flex items-center justify-between text-xs">
-                    <span className="text-white/40">R$ {pessoa.preco_por_foto.toFixed(2).replace('.', ',')} / foto</span>
-                    <span className="text-blue-400 group-hover:translate-x-1 transition-transform">Ver fotos →</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </main>
-
-        {showNovaPessoa && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-            onClick={() => setShowNovaPessoa(false)}>
-            <div className="surface-card rounded-3xl max-w-lg w-full p-8" onClick={(e) => e.stopPropagation()}>
-              <h2 className="text-2xl font-bold mb-2">Nova pessoa</h2>
-              <p className="text-sm text-white/50 mb-6">
-                Um código único será gerado automaticamente
-              </p>
-
-              <form onSubmit={criarPessoa} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    Nome completo *
-                  </label>
-                  <input type="text" value={novoNome} onChange={(e) => setNovoNome(e.target.value)}
-                    placeholder="Ex: Fulano de Tal" className="input-base" required />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    Turma
-                  </label>
-                  <input type="text" value={novoTurma} onChange={(e) => setNovoTurma(e.target.value)}
-                    placeholder="Ex: 3º Ano A" className="input-base" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    Descrição (opcional)
-                  </label>
-                  <input type="text" value={novoDescricao} onChange={(e) => setNovoDescricao(e.target.value)}
-                    placeholder="Ex: Participante da feira" className="input-base" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    Preço por foto (R$)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 font-semibold">R$</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={novoPreco}
-                      onChange={(e) => setNovoPreco(formatarPreco(e.target.value))}
-                      placeholder="0,00"
-                      className="w-full pl-12 pr-4 py-3 rounded-xl font-mono"
-                    />
-                  </div>
-                  <p className="text-xs text-white/40 mt-1">Use vírgula para centavos (ex: 5,00)</p>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={() => setShowNovaPessoa(false)}
-                    className="flex-1 py-3 rounded-xl surface-card hover:bg-slate-800 font-semibold">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={criando}
-                    className="btn-primary flex-1 py-3 disabled:opacity-50">
-                    {criando ? 'Criando...' : 'Criar pessoa'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {mostrarPendentes && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-            onClick={() => setMostrarPendentes(false)}
-          >
-            <div
-              className="surface-card rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-yellow-400" />
-                  Compras pendentes
-                </h3>
-                <button onClick={() => setMostrarPendentes(false)} className="w-8 h-8 rounded-full surface-card flex items-center justify-center hover:bg-slate-800">
-                  <span className="text-xl">×</span>
-                </button>
-              </div>
-
-              {comprasPendentes.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-5xl mb-3 opacity-50">✅</div>
-                  <p className="text-white/60">Nenhuma compra pendente</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {comprasPendentes.map(compra => (
-                    <div key={compra.id} className="surface-card rounded-xl p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold">{compra.cliente_nome}</div>
-                          <div className="flex items-center gap-1 text-xs text-white/50 mt-1">
-                            <Mail className="w-3 h-3" />
-                            {compra.cliente_email}
-                          </div>
-                          <div className="text-sm text-white/70 mt-2">
-                            📷 {compra.foto?.titulo || 'Foto'}
-                          </div>
-                          <div className="text-lg font-bold text-green-400 mt-1">
-                            R$ {compra.valor_pago?.toFixed(2).replace('.', ',')}
-                          </div>
-                          <div className="text-xs text-white/40 mt-1">
-                            {new Date(compra.created_at).toLocaleString('pt-BR')}
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <button
-                            onClick={() => liberarCompra(compra)}
-                            className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-semibold whitespace-nowrap"
-                          >
-                            ✓ Liberar
-                          </button>
-                          <button
-                            onClick={() => rejeitarCompra(compra)}
-                            className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-sm font-semibold whitespace-nowrap"
-                          >
-                            ✗ Rejeitar
-                          </button>
-                        </div>
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber to-amber-deep text-canvas text-sm font-bold flex items-center justify-center shrink-0">
+                        {p.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-display text-base font-medium text-ink truncate">
+                            {p.nome}
+                          </span>
+                          {p.turma && (
+                            <span className="badge badge-muted text-[10px]">{p.turma}</span>
+                          )}
+                        </div>
+                        {p.descricao && (
+                          <p className="text-xs text-ink-soft line-clamp-1">{p.descricao}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <code className="font-mono text-xs text-ink-soft px-2 py-1 bg-surface-2 rounded">
+                          {p.codigo}
+                        </code>
+                        <span className="font-display text-sm text-amber">
+                          R$ {p.preco_por_foto.toFixed(2).replace('.', ',')}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-ink-soft group-hover:text-amber transition-colors" />
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </main>
+        </div>
+
+        {/* MODAL: NOVA PESSOA */}
+        {showNovaPessoa && (
+          <ModalSheet onClose={() => setShowNovaPessoa(false)}>
+            <header className="rule-bottom pb-4 mb-6">
+              <p className="eyebrow mb-2">Novo cadastro</p>
+              <h2 className="font-display text-2xl font-medium text-ink">Nova pessoa</h2>
+              <p className="text-ink-soft text-sm mt-1">
+                Um código único será gerado automaticamente.
+              </p>
+            </header>
+
+            <form onSubmit={criarPessoa} className="space-y-6">
+              <FormField label="Nome completo *" htmlFor="novo-nome">
+                <input
+                  id="novo-nome" type="text" value={novoNome}
+                  onChange={(e) => setNovoNome(e.target.value)}
+                  placeholder="Ex: Lucas Emanuel da Silva"
+                  className="input-editorial" required
+                />
+              </FormField>
+              <FormField label="Turma" htmlFor="novo-turma">
+                <input
+                  id="novo-turma" type="text" value={novoTurma}
+                  onChange={(e) => setNovoTurma(e.target.value)}
+                  placeholder="Ex: 3º Ano A"
+                  className="input-editorial"
+                />
+              </FormField>
+              <FormField label="Descrição (opcional)" htmlFor="novo-desc">
+                <input
+                  id="novo-desc" type="text" value={novoDescricao}
+                  onChange={(e) => setNovoDescricao(e.target.value)}
+                  placeholder="Ex: Participante da feira"
+                  className="input-editorial"
+                />
+              </FormField>
+              <FormField label="Preço por foto (R$)" htmlFor="novo-preco">
+                <input
+                  id="novo-preco" type="text" inputMode="decimal" value={novoPreco}
+                  onChange={(e) => setNovoPreco(formatarPreco(e.target.value))}
+                  placeholder="0,00"
+                  className="input-editorial font-mono"
+                />
+                <p className="text-xs text-ink-soft mt-2">Use vírgula para centavos (ex: 5,00).</p>
+              </FormField>
+
+              <div className="flex items-center gap-4 pt-2">
+                <button type="button" onClick={() => setShowNovaPessoa(false)} className="btn-ghost-editorial">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={criando} className="btn-ink disabled:opacity-40">
+                  {criando ? 'Criando…' : 'Criar pessoa'}
+                </button>
+              </div>
+            </form>
+          </ModalSheet>
         )}
 
+        {/* MODAL: PENDENTES */}
+        {mostrarPendentes && (
+          <ModalSheet size="lg" onClose={() => setMostrarPendentes(false)}>
+            <header className="flex items-baseline justify-between rule-bottom pb-4 mb-6">
+              <div>
+                <p className="eyebrow mb-2">Confirmação manual</p>
+                <h3 className="font-display text-2xl font-medium text-ink">Compras pendentes</h3>
+              </div>
+              <button onClick={() => setMostrarPendentes(false)} className="btn-ghost-editorial">
+                <X className="w-4 h-4" />
+              </button>
+            </header>
+
+            {comprasPendentes.length === 0 ? (
+              <p className="py-8 text-center text-ink-soft">Nenhuma compra pendente.</p>
+            ) : (
+              <ul className="divide-y divide-rule">
+                {comprasPendentes.map((compra) => (
+                  <li key={compra.id} className="py-4 flex items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-display text-base font-medium text-ink">{compra.cliente_nome}</p>
+                      <p className="text-sm text-ink-soft">{compra.cliente_email}</p>
+                      <p className="text-sm mt-2 text-ink">
+                        Foto: <em className="italic">{compra.foto?.titulo || '—'}</em>
+                      </p>
+                      <p className="font-display text-lg font-medium mt-1 text-amber">
+                        R$ {compra.valor_pago?.toFixed(2).replace('.', ',')}
+                      </p>
+                      <p className="text-xs text-ink-soft mt-1">
+                        {new Date(compra.created_at).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2 shrink-0">
+                      <button onClick={() => liberarCompra(compra)} className="btn-amber-pill text-sm">
+                        <Check className="w-3.5 h-3.5" />
+                        Liberar
+                      </button>
+                      <button onClick={() => rejeitarCompra(compra)} className="btn-link text-sm text-crimson">
+                        Rejeitar
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ModalSheet>
+        )}
+
+        {/* MODAL: CONFIG PIX */}
         {mostrarConfig && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-            onClick={() => setMostrarConfig(false)}
-          >
-            <div
-              className="surface-card rounded-3xl max-w-md w-full p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-xl font-bold mb-2">⚙️ Configurações PIX</h3>
-              <p className="text-sm text-white/60 mb-4">
-                Sua chave PIX será usada para receber os pagamentos das compras de fotos.
+          <ModalSheet onClose={() => setMostrarConfig(false)}>
+            <header className="rule-bottom pb-4 mb-6">
+              <p className="eyebrow mb-2">Configurações</p>
+              <h3 className="font-display text-2xl font-medium text-ink">Chave PIX e WhatsApp</h3>
+              <p className="text-ink-soft text-sm mt-1">
+                Sua chave PIX será usada para receber os pagamentos.
               </p>
+            </header>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    Chave PIX
-                  </label>
-                  <input
-                    type="text"
-                    value={chavePix}
-                    onChange={(e) => setChavePix(e.target.value)}
-                    placeholder="email@exemplo.com, CPF, CNPJ, celular ou chave aleatória"
-                    className="input-base"
-                  />
-                  <p className="text-xs text-white/40 mt-2">
-                    Pode ser: email, CPF/CNPJ, telefone ou chave aleatória
-                  </p>
-                </div>
+            <div className="space-y-6">
+              <FormField label="Chave PIX">
+                <input
+                  type="text" value={chavePix}
+                  onChange={(e) => setChavePix(e.target.value)}
+                  placeholder="email@exemplo.com, CPF, CNPJ, celular ou chave aleatória"
+                  className="input-editorial"
+                />
+              </FormField>
+              <FormField label="WhatsApp para comprovante">
+                <input
+                  type="text" value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value)}
+                  placeholder="(11) 99999-9999"
+                  className="input-editorial"
+                />
+                <p className="text-xs text-ink-soft mt-2">Onde os clientes enviarão os comprovantes.</p>
+              </FormField>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    WhatsApp para comprovante
-                  </label>
-                  <input
-                    type="text"
-                    value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value)}
-                    placeholder="(11) 99999-9999"
-                    className="input-base"
-                  />
-                  <p className="text-xs text-white/40 mt-2">
-                    Onde os clientes enviarão os comprovantes
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setMostrarConfig(false)}
-                    className="flex-1 py-3 rounded-xl surface-card hover:bg-slate-800 font-semibold"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={salvarConfig}
-                    className="btn-primary flex-1 py-3"
-                  >
-                    Salvar
-                  </button>
-                </div>
+              <div className="flex items-center gap-4 pt-2">
+                <button onClick={() => setMostrarConfig(false)} className="btn-ghost-editorial">Cancelar</button>
+                <button onClick={salvarConfig} className="btn-ink">Salvar</button>
               </div>
             </div>
-          </div>
+          </ModalSheet>
         )}
       </div>
     )
   }
 
-  // VIEW: Fotos de uma pessoa
-  return (
-    <div className="min-h-screen text-white">
-      <nav className="sticky top-0 z-50 surface-nav">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button onClick={() => setPessoaSelecionada(null)} className="flex items-center gap-2 text-sm text-white/60 hover:text-white">
-            <ArrowLeft className="w-4 h-4" />
-            Todas as pessoas
-          </button>
-          <div className="text-center flex-1">
-            <h2 className="font-bold text-lg">{pessoaSelecionada.nome}</h2>
-            <p className="text-xs text-white/50 font-mono">{pessoaSelecionada.codigo}</p>
-          </div>
-          <button
-            onClick={() => copiarCodigo(pessoaSelecionada.codigo)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg surface-card hover:bg-slate-800"
-          >
-            {codigoCopiado ? <><Check className="w-3 h-3 text-green-400" /> Copiado</> : <><Copy className="w-3 h-3" /> Copiar</>}
-          </button>
+  /* ---------- EVENTOS & ÁLBUNS (placeholder visual) ---------- */
+  if (section === 'eventos') {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header variant="admin" onVoltar={onVoltar} navItems={navItems} />
+        <div className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-10 grid lg:grid-cols-[240px_1fr] gap-8">
+          <aside>
+            <p className="eyebrow mb-3 px-3">PAINEL</p>
+            <nav className="space-y-1">
+              <SidebarItem icon={LayoutDashboard} label="Visão Geral" onClick={() => setSection('overview')} />
+              <SidebarItem icon={CalendarRange} label="Eventos & Álbuns" active />
+              <SidebarItem icon={Wallet} label="Vendas & PIX" />
+              <SidebarItem icon={Ticket} label="Códigos & Cupons" onClick={() => setSection('cupons')} />
+              <SidebarItem icon={Settings} label="Chave PIX" onClick={() => setMostrarConfig(true)} />
+            </nav>
+          </aside>
+          <main>
+            <header className="rule-bottom pb-6 mb-8">
+              <p className="eyebrow mb-2">COBERTURA</p>
+              <h1 className="font-display text-3xl md:text-4xl font-medium text-ink">
+                Eventos & Álbuns
+              </h1>
+              <p className="text-ink-soft mt-2 text-sm">
+                Cada pessoa cadastrada já vira um álbum automático.
+              </p>
+            </header>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pessoas.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => carregarFotosPessoa(p)}
+                  className="card !p-0 text-left hover:border-amber/40 transition-colors group overflow-hidden"
+                >
+                  <div className="aspect-[4/3] bg-surface-2 relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-amber/15 to-surface-1" />
+                    <span className="absolute top-3 left-3 badge badge-amber">ÁLBUM</span>
+                  </div>
+                  <div className="p-4">
+                    <p className="font-display text-base font-medium text-ink mb-1">{p.nome}</p>
+                    <code className="font-mono text-xs text-ink-soft">{p.codigo}</code>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </main>
         </div>
-      </nav>
+      </div>
+    )
+  }
 
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        <section className="mb-12">
-          <div className="surface-card rounded-3xl p-8">
-            <h3 className="text-xl font-bold mb-6">Adicionar foto</h3>
+  /* ---------- CÓDIGOS & CUPONS (placeholder) ---------- */
+  if (section === 'cupons') {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header variant="admin" onVoltar={onVoltar} navItems={navItems} />
+        <div className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-10 grid lg:grid-cols-[240px_1fr] gap-8">
+          <aside>
+            <p className="eyebrow mb-3 px-3">PAINEL</p>
+            <nav className="space-y-1">
+              <SidebarItem icon={LayoutDashboard} label="Visão Geral" onClick={() => setSection('overview')} />
+              <SidebarItem icon={CalendarRange} label="Eventos & Álbuns" onClick={() => setSection('eventos')} />
+              <SidebarItem icon={Wallet} label="Vendas & PIX" />
+              <SidebarItem icon={Ticket} label="Códigos & Cupons" active />
+              <SidebarItem icon={Settings} label="Chave PIX" onClick={() => setMostrarConfig(true)} />
+            </nav>
+          </aside>
+          <main>
+            <header className="rule-bottom pb-6 mb-8">
+              <p className="eyebrow mb-2">ACESSO</p>
+              <h1 className="font-display text-3xl md:text-4xl font-medium text-ink">Códigos & Cupons</h1>
+              <p className="text-ink-soft mt-2 text-sm">
+                Códigos de resgate são gerados automaticamente por cadastro.
+              </p>
+            </header>
+            <div className="card !p-12 text-center">
+              <Hash className="w-12 h-12 mx-auto mb-4 text-amber" strokeWidth={1.4} />
+              <p className="font-display text-xl text-ink mb-2">Cupons em breve</p>
+              <p className="text-ink-soft text-sm max-w-md mx-auto">
+                A funcionalidade de cupons de desconto e códigos personalizados
+                será lançada em uma próxima versão.
+              </p>
+            </div>
+          </main>
+        </div>
+      </div>
+    )
+  }
 
-            <form onSubmit={handleUploadFoto} className="grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
+  /* ---------- DETALHE DE UMA PESSOA (UPLOAD + GALERIA + SIDEBAR DIREITA) ---------- */
+  if (!pessoaSelecionada) return null
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header
+        variant="admin"
+        onVoltar={() => setPessoaSelecionada(null)}
+        navItems={navItems}
+      />
+
+      <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-10">
+        {/* BREADCRUMB + AÇÕES */}
+        <header className="mb-8">
+          <nav className="flex items-center gap-2 text-xs text-ink-soft mb-3">
+            <button onClick={() => setPessoaSelecionada(null)} className="hover:text-amber transition-colors">
+              Pessoas
+            </button>
+            <ChevronRight className="w-3 h-3" />
+            <span className="text-ink">{pessoaSelecionada.nome}</span>
+          </nav>
+
+          <div className="flex items-end justify-between gap-4 flex-wrap">
+            <div>
+              <p className="eyebrow mb-2">GESTÃO DE PARTICIPANTES</p>
+              <h1 className="font-display text-3xl md:text-4xl font-medium text-ink">
+                {pessoaSelecionada.nome}
+              </h1>
+              {pessoaSelecionada.descricao && (
+                <p className="text-ink-soft mt-2 text-sm max-w-xl">{pessoaSelecionada.descricao}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => copiarCodigo(pessoaSelecionada.codigo)} className="btn-line">
+                {codigoCopiado ? <><Check className="w-3.5 h-3.5" /> Copiado</> : <><Copy className="w-3.5 h-3.5" /> Copiar Código</>}
+              </button>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}?codigo=${pessoaSelecionada.codigo}`
+                  navigator.clipboard.writeText(url)
+                  alert('Link de resgate copiado')
+                }}
+                className="btn-line"
+              >
+                <Mail className="w-3.5 h-3.5" /> Compartilhar
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* LAYOUT: FORM UPLOAD + GALERIA (esq) | SIDEBAR (dir) */}
+        <div className="grid lg:grid-cols-[1fr_300px] gap-8">
+          {/* COLUNA ESQUERDA */}
+          <div className="space-y-12">
+            {/* UPLOAD */}
+            <section>
+              <header className="flex items-baseline justify-between mb-5">
+                <div>
+                  <p className="eyebrow mb-1">ADICIONAR</p>
+                  <h2 className="font-display text-2xl font-medium text-ink">Novas fotos</h2>
+                </div>
+                {arquivos.length > 0 && (
+                  <span className="badge badge-amber">
+                    {arquivos.length} {arquivos.length === 1 ? 'ARQUIVO' : 'ARQUIVOS'} NA FILA
+                  </span>
+                )}
+              </header>
+
+              <form onSubmit={handleUploadFoto} className="space-y-6">
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
-                  className="cursor-pointer rounded-2xl border-2 border-dashed border-slate-700 hover:border-slate-500 bg-[#1E293B] transition-all overflow-hidden"
+                  className="dropzone"
                 >
                   {previewsUrls.length > 0 ? (
-                    <div className="p-4">
-                      <div className="text-sm text-white/60 mb-3 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm text-ink-soft mb-4 flex items-center justify-between">
                         <span>{arquivos.length} {arquivos.length === 1 ? 'imagem selecionada' : 'imagens selecionadas'}</span>
-                        <span className="text-xs text-blue-400">Clique pra trocar</span>
+                        <span className="eyebrow">Clique para trocar</span>
                       </div>
                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-64 overflow-y-auto">
                         {previewsUrls.map((url, idx) => (
-                          <div key={idx} className="relative aspect-square rounded-lg overflow-hidden">
+                          <div key={idx} className="aspect-square overflow-hidden">
                             <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
                           </div>
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <div className="aspect-video flex flex-col items-center justify-center gap-2 p-8">
-                      <div className="text-5xl">📸</div>
-                      <p className="text-white/80 font-semibold">Clique ou arraste fotos aqui</p>
-                      <p className="text-sm text-white/50">Você pode selecionar várias de uma vez, ou uma pasta inteira</p>
+                    <div>
+                      <FolderUp className="w-10 h-10 text-amber mx-auto mb-3" strokeWidth={1.4} />
+                      <p className="dropzone-label">Arraste e solte fotos aqui</p>
+                      <p className="dropzone-hint">RAW, JPEG ou TIFF — várias de uma vez</p>
                     </div>
                   )}
                   <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => handleFiles(e.target.files)}
-                    className="hidden"
+                    ref={fileInputRef} type="file" accept="image/*" multiple
+                    onChange={(e) => handleFiles(e.target.files)} className="hidden"
                   />
                 </div>
-                <p className="text-xs text-white/40 mt-2 flex items-center gap-2 flex-wrap">
-                  <span>💡 <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white/70">Ctrl+clique</kbd> pra várias fotos</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDiretorio()
-                    }}
-                    className="text-blue-400 hover:text-blue-300 underline"
-                  >
+
+                <p className="text-xs text-ink-soft flex items-center gap-2 flex-wrap">
+                  <span>
+                    <kbd className="font-mono px-1.5 py-0.5 border border-rule text-xs">Ctrl+clique</kbd>
+                    {' '}para várias fotos
+                  </span>
+                  <span>·</span>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); handleDiretorio() }} className="btn-link text-xs">
                     ou selecione uma pasta inteira
                   </button>
                 </p>
-              </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                  {arquivos.length > 1 ? `Títulos serão automáticos: ${normalizarNome(pessoaSelecionada.nome)}_${(fotosPessoa.length + 1).toString().padStart(3, '0')} até _${(fotosPessoa.length + arquivos.length).toString().padStart(3, '0')}` : 'Título *'}
-                </label>
                 {arquivos.length <= 1 && (
-                  <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)}
-                    placeholder={gerarProximoTitulo()} className="input-base" />
+                  <FormField label="Título">
+                    <input
+                      type="text" value={titulo}
+                      onChange={(e) => setTitulo(e.target.value)}
+                      placeholder={gerarProximoTitulo()}
+                      className="input-editorial"
+                    />
+                  </FormField>
                 )}
-              </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                  Descrição (opcional, aplica a todas)
-                </label>
-                <input type="text" value={descricao} onChange={(e) => setDescricao(e.target.value)}
-                  placeholder="Descrição das fotos..." className="input-base" />
-              </div>
+                {arquivos.length > 1 && (
+                  <p className="text-sm text-ink-soft">
+                    Títulos automáticos:{' '}
+                    <em className="italic text-amber">
+                      {normalizarNome(pessoaSelecionada.nome)}_
+                      {(fotosPessoa.length + 1).toString().padStart(3, '0')}
+                      {' '}até{' '}
+                      _{(fotosPessoa.length + arquivos.length).toString().padStart(3, '0')}
+                    </em>
+                  </p>
+                )}
 
-              <div className="md:col-span-2">
-                <button type="submit" disabled={uploading || arquivos.length === 0}
-                  className="btn-primary w-full py-3 disabled:opacity-50">
-                  {uploading ? (
-                    <>
-                      <span className="animate-spin">⏳</span>
-                      Enviando {progressoUpload.atual}/{progressoUpload.total}...
-                    </>
-                  ) : (
-                    <><Upload className="w-4 h-4" /> Adicionar {arquivos.length > 1 ? `${arquivos.length} fotos` : 'foto'}</>
+                <FormField label="Descrição (opcional, aplica a todas)">
+                  <input
+                    type="text" value={descricao}
+                    onChange={(e) => setDescricao(e.target.value)}
+                    placeholder="Descrição das fotos…"
+                    className="input-editorial"
+                  />
+                </FormField>
+
+                <button
+                  type="submit" disabled={uploading || arquivos.length === 0}
+                  className="btn-ink disabled:opacity-40"
+                >
+                  <Upload className="w-4 h-4" />
+                  {uploading
+                    ? `Enviando ${progressoUpload.atual}/${progressoUpload.total}…`
+                    : arquivos.length > 1
+                      ? `Enviar e Processar ${arquivos.length} Fotos`
+                      : 'Enviar e Processar Foto'}
+                </button>
+              </form>
+            </section>
+
+            {/* GALERIA */}
+            <section>
+              <header className="flex items-baseline justify-between mb-5 rule-bottom pb-3">
+                <div>
+                  <p className="eyebrow mb-1">ÁLBUM</p>
+                  <h2 className="font-display text-2xl font-medium text-ink">Fotos atribuídas</h2>
+                </div>
+                <span className="text-sm text-ink-soft">
+                  {fotosPessoa.length} {fotosPessoa.length === 1 ? 'foto' : 'fotos'}
+                </span>
+              </header>
+
+              {fotosPessoa.length === 0 ? (
+                <p className="py-16 text-center text-ink-soft">
+                  Nenhuma foto ainda. Adicione a primeira acima.
+                </p>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                  {fotosPessoa.map((foto, idx) => (
+                    <div key={foto.id} className="photo-cell group">
+                      <div className="relative">
+                        <img src={foto.url} alt={foto.titulo} className="photo-cell-image" />
+                        <span className="photo-cell-badge">
+                          #{String(idx + 1).padStart(3, '0')}
+                        </span>
+                        {foto.vendida && (
+                          <span className="photo-cell-sold">Vendida</span>
+                        )}
+                        <button
+                          onClick={() => deletarFoto(foto)}
+                          className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-canvas/85 backdrop-blur-sm border border-crimson/50 text-crimson rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Deletar"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="photo-cell-meta">
+                        <span className="photo-cell-meta-title truncate">{foto.titulo}</span>
+                        {!foto.vendida && (
+                          <span className="photo-cell-meta-price">
+                            {pessoaSelecionada.preco_por_foto.toFixed(2).replace('.', ',')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* SIDEBAR DIREITA — cards de info */}
+          <aside className="space-y-4">
+            <SidebarCard titulo="Participante Cadastrado" eyebrow="DADOS DA PESSOA">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber to-amber-deep text-canvas text-sm font-bold flex items-center justify-center">
+                  {pessoaSelecionada.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-display text-base font-medium text-ink truncate">
+                    {pessoaSelecionada.nome}
+                  </p>
+                  {pessoaSelecionada.turma && (
+                    <span className="badge badge-muted text-[10px]">{pessoaSelecionada.turma}</span>
                   )}
+                </div>
+              </div>
+            </SidebarCard>
+
+            <SidebarCard titulo="Código Direto" eyebrow="RESGATE">
+              <code className="block font-mono text-2xl tracking-[0.15em] text-amber text-center py-3 bg-canvas rounded border border-rule">
+                {pessoaSelecionada.codigo}
+              </code>
+              <button
+                onClick={() => copiarCodigo(pessoaSelecionada.codigo)}
+                className="btn-line w-full !justify-center text-sm mt-3"
+              >
+                {codigoCopiado ? <><Check className="w-3.5 h-3.5" /> Copiado!</> : <><Copy className="w-3.5 h-3.5" /> Copiar Código</>}
+              </button>
+            </SidebarCard>
+
+            <SidebarCard titulo="Estatísticas" eyebrow="MÉTRICAS">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="card !p-3 !bg-surface-2">
+                  <p className="eyebrow mb-1">TOTAL DE FOTOS</p>
+                  <p className="font-display text-2xl text-amber">{fotosPessoa.length}</p>
+                </div>
+                <div className="card !p-3 !bg-surface-2">
+                  <p className="eyebrow mb-1">PREÇO</p>
+                  <p className="font-display text-2xl text-amber">
+                    {pessoaSelecionada.preco_por_foto.toFixed(2).replace('.', ',')}
+                  </p>
+                </div>
+              </div>
+            </SidebarCard>
+
+            <SidebarCard eyebrow="INTENÇÃO DE COMPRA" comSparkle>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="badge badge-active">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber animate-pulse-dot" />
+                  ATIVO
+                </span>
+              </div>
+              <p className="text-sm text-ink-soft leading-relaxed">
+                {fotosPessoa.some(f => f.vendida)
+                  ? 'Cliente já comprou fotos desta sessão.'
+                  : 'Aguardando primeira interação do cliente na galeria.'}
+              </p>
+            </SidebarCard>
+
+            <SidebarCard titulo="Notificar Participante" eyebrow="WHATSAPP & EMAIL">
+              <div className="space-y-2">
+                <a
+                  href={gerarLinkWhatsApp({
+                    nome: pessoaSelecionada.nome,
+                    email: '',
+                    pessoa: pessoaSelecionada.nome,
+                    codigo: pessoaSelecionada.codigo,
+                    quantidade: fotosPessoa.length,
+                    valor: 0,
+                    pixCopiaCola: '',
+                    whatsappDestino: whatsapp || '5511999999999',
+                  })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-whatsapp w-full !justify-center"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  Enviar WhatsApp
+                </a>
+                <button className="btn-line w-full !justify-center text-sm">
+                  <Mail className="w-3.5 h-3.5" />
+                  Enviar E-mail
                 </button>
               </div>
-            </form>
-          </div>
-        </section>
-
-        <section>
-          <div className="flex items-baseline justify-between mb-6">
-            <h3 className="text-2xl font-bold">Fotos</h3>
-            <span className="text-sm text-white/50">{fotosPessoa.length} {fotosPessoa.length === 1 ? 'foto' : 'fotos'}</span>
-          </div>
-
-          {fotosPessoa.length === 0 ? (
-            <div className="text-center py-20 surface-card rounded-3xl">
-              <div className="text-6xl mb-4">📷</div>
-              <p className="text-white/50">Nenhuma foto ainda. Adicione a primeira acima.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {fotosPessoa.map((foto) => (
-                <div key={foto.id} className="surface-card rounded-2xl overflow-hidden group">
-                  <div className="relative aspect-[4/3]">
-                    <img src={foto.url} alt={foto.titulo} className="w-full h-full object-cover" />
-                    {foto.vendida && (
-                      <div className="absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-semibold bg-green-500/90 text-white">
-                        Vendida
-                      </div>
-                    )}
-                    <button
-                      onClick={() => deletarFoto(foto)}
-                      className="absolute top-2 left-2 w-8 h-8 rounded-md bg-red-500/90 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="p-3">
-                    <p className="font-semibold text-sm truncate">{foto.titulo}</p>
-                    {foto.descricao && <p className="text-xs text-white/50 truncate">{foto.descricao}</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+            </SidebarCard>
+          </aside>
+        </div>
       </main>
+    </div>
+  )
+}
+
+/* ---------------- Subcomponentes ---------------- */
+
+function SidebarItem({
+  icon: Icon, label, active, onClick, badge,
+}: {
+  icon: React.ElementType
+  label: string
+  active?: boolean
+  onClick?: () => void
+  badge?: number
+}) {
+  return (
+    <button onClick={onClick} className={`sidebar-item ${active ? 'is-active' : ''}`}>
+      <Icon className="w-4 h-4" />
+      <span className="flex-1 text-left">{label}</span>
+      {badge !== undefined && (
+        <span className="badge badge-amber text-[10px]">{badge}</span>
+      )}
+    </button>
+  )
+}
+
+function FormField({
+  label, htmlFor, children,
+}: {
+  label: string
+  htmlFor?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <label htmlFor={htmlFor} className="block eyebrow mb-2">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function ModalSheet({
+  children, onClose, size = 'md',
+}: {
+  children: React.ReactNode
+  onClose: () => void
+  size?: 'md' | 'lg'
+}) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className={`modal-sheet ${size === 'lg' ? 'modal-sheet-lg' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-sheet-body">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function SidebarCard({
+  titulo, eyebrow, children, comSparkle,
+}: {
+  titulo?: string
+  eyebrow: string
+  children: React.ReactNode
+  comSparkle?: boolean
+}) {
+  return (
+    <div className="card">
+      <div className="flex items-center gap-2 mb-3">
+        <p className="eyebrow">{eyebrow}</p>
+        {comSparkle && <Sparkles className="w-3 h-3 text-amber" />}
+      </div>
+      {titulo && (
+        <p className="font-display text-base font-medium text-ink mb-3">{titulo}</p>
+      )}
+      {children}
+    </div>
+  )
+}
+
+function EmptyStateNova({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="card !p-12 text-center">
+      <div className="w-16 h-16 rounded-full bg-amber/10 border border-amber/30 flex items-center justify-center mx-auto mb-4">
+        <Plus className="w-7 h-7 text-amber" />
+      </div>
+      <p className="font-display text-2xl text-ink mb-2">Nenhuma pessoa ainda</p>
+      <p className="text-ink-soft text-sm mb-6 max-w-md mx-auto">
+        Comece cadastrando a primeira pessoa. Um código único será gerado
+        automaticamente para que ela resgate as fotos pela galeria.
+      </p>
+      <button onClick={onClick} className="btn-amber-pill">
+        Cadastrar primeira pessoa
+      </button>
     </div>
   )
 }

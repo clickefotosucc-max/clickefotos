@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase'
 import type { Foto, Pessoa } from '@/types'
 import AreaCliente from '@/components/AreaCliente'
 import AreaAdmin from '@/components/AreaAdmin'
-import { Camera, Lock } from 'lucide-react'
+import Header from '@/components/Header'
+import { ArrowRight, Camera, Sparkles, Clock } from 'lucide-react'
 
 export default function Home() {
   const [view, setView] = useState<'home' | 'cliente' | 'admin'>('home')
@@ -86,178 +87,309 @@ export default function Home() {
     return <AreaAdmin onVoltar={() => setView('home')} />
   }
 
-  return (
-    <div className="min-h-screen text-white bg-[#0F172A]">
-      {/* Navbar */}
-      <nav className="sticky top-0 z-50 surface-nav">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
-              <Camera className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">Clickefotos</h1>
-              <p className="text-xs text-white/50 -mt-0.5">Suas fotos da feira</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setView('admin')}
-            className="btn-ghost"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            Área do Organizador
-          </button>
-        </div>
-      </nav>
+  const navItems = [
+    { label: 'Resgatar Fotos', active: view === 'home', onClick: () => { setView('home'); setErro('') } },
+    { label: 'Minha Galeria' },
+    { label: 'Painel do Fotógrafo', onClick: () => setView('admin') },
+  ]
 
-      <main className="max-w-5xl mx-auto px-6 py-20">
-        <section className="text-center mb-16 animate-fade-up">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full surface-pill text-xs font-medium text-blue-400 mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
-            FEIRA DE EMPREENDEDORISMO 2025
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header
+        variant="home"
+        navItems={navItems}
+      />
+
+      <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-10 py-12 md:py-20">
+        {/* HERO — duas colunas em desktop */}
+        <section className="grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center mb-20 md:mb-28 animate-fade-up">
+          {/* Coluna texto */}
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <span className="badge badge-amber">
+                <Sparkles className="w-3 h-3" />
+                EDIÇÃO OFICIAL 2025
+              </span>
+              <span className="hidden sm:inline badge badge-muted">
+                ESTÚDIO ACREDITAR
+              </span>
+            </div>
+
+            <h1 className="font-display text-[2.25rem] sm:text-6xl lg:text-7xl font-medium leading-[1.02] tracking-tight mb-6 text-ink">
+              Suas fotos
+              <br />
+              da feira,
+              <br />
+              <em className="italic text-amber">a um clique</em>
+              <br />
+              de distância.
+            </h1>
+
+            <p className="text-base sm:text-lg text-ink-soft leading-relaxed max-w-lg mb-8">
+              Digite o código que você recebeu na feira e veja todas as suas
+              fotos reunidas num só lugar. Escolha as melhores, pague via PIX
+              e leve em alta resolução direto pelo navegador.
+            </p>
+
+            {/* Sessões tempo real — miniaturas */}
+            <div className="flex items-center gap-3 mb-2">
+              <span className="flex items-center gap-1.5 text-xs text-ink-soft font-medium">
+                <Clock className="w-3.5 h-3.5" />
+                TEMPO REAL
+              </span>
+              <span className="flex-1 h-px bg-rule" />
+            </div>
+            <p className="text-xs text-ink-soft mb-4">
+              Sessões recém-fotografadas — últimos 30 min
+            </p>
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              {['12:42', '12:38', '12:31', '12:24'].map((hora, i) => (
+                <div key={i} className="relative group">
+                  <div
+                    className="aspect-[4/3] rounded bg-surface-1 border border-rule overflow-hidden"
+                    style={{
+                      backgroundImage: `linear-gradient(135deg, hsl(${(i * 47 + 200) % 360}, 30%, 18%) 0%, hsl(${(i * 47 + 240) % 360}, 25%, 12%) 100%)`,
+                    }}
+                  />
+                  <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-canvas/85 backdrop-blur-sm text-[10px] font-mono text-ink-soft">
+                    {hora}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <h2 className="text-5xl md:text-7xl font-black tracking-tight mb-6">
-            Suas fotos da feira, <br />
-            <span className="text-blue-400">em um só lugar.</span>
-          </h2>
-          <p className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
-            Digite o código que você recebeu na feira e veja todas as suas fotos.
-            Escolha as melhores e leve em alta resolução.
-          </p>
+
+          {/* Coluna card de acesso */}
+          <div className="lg:pl-8">
+            {view === 'admin' && !adminAutenticado ? (
+              <AcessoAdminCard
+                senhaAdmin={senhaAdmin}
+                setSenhaAdmin={setSenhaAdmin}
+                erro={erro}
+                onSubmit={handleAdmin}
+                onCancel={() => { setView('home'); setErro(''); setSenhaAdmin('') }}
+              />
+            ) : (
+              <AcessoClienteCard
+                codigo={codigo}
+                setCodigo={setCodigo}
+                erro={erro}
+                onSubmit={buscarPessoa}
+                buscando={buscando}
+              />
+            )}
+          </div>
         </section>
 
-        {view === 'admin' && !adminAutenticado ? (
-          <section className="max-w-md mx-auto animate-fade-up">
-            <div className="surface-card p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center">
-                  <Lock className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">Área do Organizador</h3>
-                  <p className="text-sm text-white/50">Digite a senha para continuar</p>
-                </div>
-              </div>
-
-              <form onSubmit={handleAdmin} className="space-y-4">
-                <input
-                  type="password"
-                  value={senhaAdmin}
-                  onChange={(e) => setSenhaAdmin(e.target.value)}
-                  placeholder="Senha"
-                  className="input-base"
-                  autoFocus
-                />
-                {erro && (
-                  <p className="text-sm text-red-400">{erro}</p>
-                )}
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView('home')
-                      setErro('')
-                      setSenhaAdmin('')
-                    }}
-                    className="btn-secondary flex-1 py-3"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-primary flex-1 py-3"
-                  >
-                    Entrar
-                  </button>
-                </div>
-              </form>
+        {/* COMO FUNCIONA — 3 etapas numeradas */}
+        <section className="mb-20">
+          <div className="flex items-baseline justify-between mb-10 rule pb-6">
+            <div>
+              <p className="eyebrow mb-2">COMO FUNCIONA</p>
+              <h2 className="font-display text-3xl md:text-4xl font-medium text-ink">
+                Três passos, sem fricção.
+              </h2>
             </div>
-          </section>
-        ) : (
-          <section className="max-w-md mx-auto animate-fade-up" style={{ animationDelay: '0.2s' }}>
-            <div className="surface-card p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-2xl">
-                  🎫
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">Acessar minhas fotos</h3>
-                  <p className="text-sm text-white/50">Use o código recebido na feira</p>
-                </div>
-              </div>
+            <span className="hidden md:inline eyebrow text-ink-muted">
+              EDIÇÃO 2025
+            </span>
+          </div>
 
-              <form onSubmit={buscarPessoa} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
-                    Código de acesso
-                  </label>
-                  <input
-                    type="text"
-                    value={codigo}
-                    onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-                    placeholder="Ex: ABC-X9K"
-                    className="input-base text-center text-2xl font-mono font-bold tracking-widest"
-                    maxLength={7}
-                  />
-                </div>
-
-                {erro && (
-                  <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300">
-                    {erro}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={buscando}
-                  className="btn-primary w-full py-4"
-                >
-                  {buscando ? (
-                    <>
-                      <span className="inline-block animate-spin">⏳</span>
-                      Buscando...
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-4 h-4" />
-                      Ver minhas fotos
-                    </>
-                  )}
-                </button>
-              </form>
-
-              <div className="mt-6 pt-6 border-t border-slate-700/50 text-center">
-                <p className="text-xs text-white/40">
-                  Não tem o código? Procure o organizador do evento.
+          <ol className="grid md:grid-cols-3 gap-6 md:gap-8">
+            {[
+              {
+                n: '01',
+                t: 'Receba seu código',
+                d: 'O fotógrafo entrega um código único no dia, registrado no estúdio.',
+              },
+              {
+                n: '02',
+                t: 'Veja suas fotos',
+                d: 'A galeria pessoal abre com todas as suas imagens já organizadas por sessão.',
+              },
+              {
+                n: '03',
+                t: 'Leve em alta resolução',
+                d: 'Selecione, pague via PIX e baixe em HD direto pelo navegador.',
+              },
+            ].map((s) => (
+              <li
+                key={s.n}
+                className="card group hover:border-rule-strong transition-colors"
+              >
+                <span className="font-display text-5xl text-amber block mb-4 leading-none">
+                  {s.n}
+                </span>
+                <h3 className="font-display text-xl font-medium mb-2 text-ink">
+                  {s.t}
+                </h3>
+                <p className="text-sm text-ink-soft leading-relaxed">
+                  {s.d}
                 </p>
-              </div>
-            </div>
-          </section>
-        )}
+              </li>
+            ))}
+          </ol>
+        </section>
 
-        <section className="mt-20 grid md:grid-cols-3 gap-6 animate-fade-up" style={{ animationDelay: '0.4s' }}>
-          {[
-            { num: '01', icon: '🎫', title: 'Digite o código', desc: 'Receba seu código único na feira' },
-            { num: '02', icon: '📸', title: 'Veja suas fotos', desc: 'Todas as suas fotos aparecem aqui' },
-            { num: '03', icon: '⬇️', title: 'Baixe em HD', desc: 'Compre e leve em alta resolução' },
-          ].map((step) => (
-            <div key={step.num} className="surface-card rounded-2xl p-6">
-              <div className="flex items-start justify-between mb-4">
-                <span className="text-3xl">{step.icon}</span>
-                <span className="text-xs font-mono text-white/30">{step.num}</span>
-              </div>
-              <h4 className="font-bold text-lg mb-1">{step.title}</h4>
-              <p className="text-sm text-white/50">{step.desc}</p>
+        {/* OFERTA ESPECIAL */}
+        <section className="card !bg-surface-2 !border-rule-strong relative overflow-hidden mb-12">
+          <div className="absolute -top-12 -right-12 w-48 h-48 bg-amber/10 rounded-full blur-3xl" />
+          <div className="relative grid md:grid-cols-[1fr_auto] gap-6 items-center">
+            <div>
+              <span className="badge badge-amber mb-3">PACOTE COMPLETO</span>
+              <h3 className="font-display text-2xl md:text-3xl font-medium text-ink mb-2">
+                Compre o pacote com <em className="italic text-amber">20% off</em>.
+              </h3>
+              <p className="text-ink-soft text-sm md:text-base max-w-lg">
+                Todas as suas fotos em alta resolução por um valor único.
+                Disponível na sua galeria após o login.
+              </p>
             </div>
-          ))}
+            <button
+              onClick={() => setView('home')}
+              className="btn-ink whitespace-nowrap"
+            >
+              Ver minha oferta
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </section>
       </main>
 
-      <footer className="border-t border-slate-700/50 mt-12">
-        <div className="max-w-7xl mx-auto px-6 py-10 text-center text-sm text-white/40">
-          Feito para a Feira de Empreendedorismo — {new Date().getFullYear()}
+      <footer className="rule-top mt-auto">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-ink-soft">
+          <span className="font-display italic text-champagne">ClickeFotos PRO</span>
+          <span>Feito para a Feira de Empreendedorismo — {new Date().getFullYear()}</span>
         </div>
       </footer>
+    </div>
+  )
+}
+
+/* ---------------- Subcomponentes do Hero ---------------- */
+
+function AcessoClienteCard({
+  codigo, setCodigo, erro, onSubmit, buscando,
+}: {
+  codigo: string
+  setCodigo: (v: string) => void
+  erro: string
+  onSubmit: (e: React.FormEvent) => void
+  buscando: boolean
+}) {
+  return (
+    <div className="card !p-8 md:!p-10 relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber to-transparent" />
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-full bg-amber-soft border border-amber/30 flex items-center justify-center">
+          <Camera className="w-5 h-5 text-amber" />
+        </div>
+        <div>
+          <p className="eyebrow">ACESSO DA GALERIA</p>
+          <p className="text-xs text-ink-soft">Para participantes cadastrados</p>
+        </div>
+      </div>
+
+      <h2 className="font-display text-2xl md:text-3xl font-medium text-ink mb-2">
+        Encontrar minhas fotos
+      </h2>
+      <p className="text-sm text-ink-soft mb-8">
+        Insira o código único que você recebeu no dia.
+      </p>
+
+      <form onSubmit={onSubmit} className="space-y-6">
+        <div>
+          <label className="block eyebrow mb-3">CÓDIGO DE ACESSO</label>
+          <input
+            type="text"
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+            placeholder="ABC-X9K"
+            className="input-editorial-serif tracking-[0.15em] !text-2xl"
+            maxLength={7}
+          />
+        </div>
+
+        {erro && (
+          <p className="text-sm text-crimson border-l-2 border-crimson pl-3 bg-crimson/5 py-2">
+            {erro}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={buscando}
+          className="btn-amber-pill w-full !justify-center !py-3.5"
+        >
+          {buscando ? 'Buscando…' : (
+            <>
+              Ver minhas fotos
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
+      </form>
+
+      <div className="rule pt-4 mt-8">
+        <p className="text-xs text-ink-soft">
+          Não tem o código? Procure o organizador do evento —
+          ele pode emitir um novo na hora.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function AcessoAdminCard({
+  senhaAdmin, setSenhaAdmin, erro, onSubmit, onCancel,
+}: {
+  senhaAdmin: string
+  setSenhaAdmin: (v: string) => void
+  erro: string
+  onSubmit: (e: React.FormEvent) => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="card !p-8 md:!p-10 relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber to-transparent" />
+      <span className="badge badge-amber mb-6">ACESSO RESTRITO</span>
+
+      <h2 className="font-display text-2xl md:text-3xl font-medium text-ink mb-2">
+        Painel do Fotógrafo
+      </h2>
+      <p className="text-sm text-ink-soft mb-8">
+        Gestão de participantes, sessões e upload de arquivos RAW.
+      </p>
+
+      <form onSubmit={onSubmit} className="space-y-6">
+        <div>
+          <label className="block eyebrow mb-3">SENHA DE ACESSO</label>
+          <input
+            type="password"
+            value={senhaAdmin}
+            onChange={(e) => setSenhaAdmin(e.target.value)}
+            placeholder="••••••••"
+            className="input-editorial"
+            autoFocus
+          />
+        </div>
+
+        {erro && (
+          <p className="text-sm text-crimson border-l-2 border-crimson pl-3 bg-crimson/5 py-2">
+            {erro}
+          </p>
+        )}
+
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={onCancel} className="btn-ghost-editorial">
+            Cancelar
+          </button>
+          <button type="submit" className="btn-ink flex-1">
+            Entrar no painel
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

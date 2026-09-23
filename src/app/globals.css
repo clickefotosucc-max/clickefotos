@@ -1,230 +1,639 @@
 @import "tailwindcss";
 
+/* ============================================================
+   CLICKEFOTOS — Studio Dark Editorial
+   Sistema visual: galeria noturna, papel champagne, accent âmbar
+   Tipografia: Newsreader (serif) + Plus Jakarta Sans (sans)
+   Inspiração: publicação de luxo, estúdio de arte, moldura fotográfica
+   ============================================================ */
+
 :root {
-  --background: #0F172A;
-  --foreground: #ffffff;
-  --card: #1E293B;
-  --border: rgba(148, 163, 184, 0.2);
-  --accent: #2563EB;
-  --accent-hover: #1D4ED8;
+  /* Paleta — Escuro editorial */
+  --canvas:        #0E0F12;   /* fundo de página */
+  --surface-1:     #14161A;   /* cards, header, sheets */
+  --surface-2:     #1A1D24;   /* hover, popovers, inputs */
+  --surface-glass: rgba(14, 15, 18, 0.85);
+
+  --ink:           #F8FAFC;   /* texto principal */
+  --ink-soft:      #94A3B8;   /* texto secundário, captions */
+  --ink-muted:     #64748B;   /* texto terciário, placeholders */
+
+  --rule:          #262A33;   /* hairlines, divisórias */
+  --rule-strong:   #3E4452;   /* bordas em hover */
+
+  --amber:         #F59E0B;   /* accent único — CTA, badges, seleção */
+  --amber-deep:    #D97706;   /* hover do accent */
+  --amber-soft:    rgba(245, 158, 11, 0.12);  /* seleção em fundo escuro */
+
+  --champagne:     #E2D9CC;   /* detalhes tipo pergaminho, assinatura */
+  --olive:         #586A3A;   /* confirmação discreta (WhatsApp) */
+
+  /* Backwards-compat — nomes antigos apontam pros novos */
+  --paper:         var(--canvas);
+  --paper-deep:    var(--surface-1);
+  --terracotta:    var(--amber);
+  --terracotta-deep: var(--amber-deep);
+  --crimson:       #B91C1C;
+
+  /* Tipografia — expostas pelas fontes do next/font */
+  --font-display:  var(--font-newsreader), Georgia, "Times New Roman", serif;
+  --font-body:     var(--font-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono:     var(--font-geist-mono), "Courier New", monospace;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Mapeia tokens pros utilitários do Tailwind (bg-canvas, text-ink, border-rule...) */
+  --color-background: var(--canvas);
+  --color-foreground: var(--ink);
+  --color-canvas: var(--canvas);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-muted: var(--ink-muted);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-amber: var(--amber);
+  --color-amber-deep: var(--amber-deep);
+  --color-accent: var(--amber);
+  --color-olive: var(--olive);
+  --color-crimson: var(--crimson);
+  --color-champagne: var(--champagne);
+  --font-sans:     var(--font-body);
+  --font-serif:    var(--font-display);
+  --font-display:  var(--font-display);
+  --font-body:     var(--font-body);
+  --font-mono:     var(--font-mono);
 }
 
 * {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  box-sizing: border-box;
 }
 
 html, body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  scroll-behavior: smooth;
-}
-
-body {
-  background: var(--background);
-  background-attachment: fixed;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-body);
   min-height: 100vh;
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: #0F172A;
-}
-::-webkit-scrollbar-thumb {
-  background: #1E293B;
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+body {
+  font-feature-settings: "ss01", "cv11";
 }
 
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Tipografia display — serifa nos títulos */
+.font-display { font-family: var(--font-display); font-optical-sizing: auto; }
+.font-body    { font-family: var(--font-body); }
+
+/* Eyebrow — caption em caps, tracking largo */
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--ink-soft);
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-}
+/* Hairline horizontal */
+.rule        { border-top: 1px solid var(--rule); }
+.rule-bottom { border-bottom: 1px solid var(--rule); }
+.rule-top    { border-top: 1px solid var(--rule); }
 
-.animate-fade-up {
-  animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
+/* Links e acentos */
+a { color: inherit; text-decoration: none; }
+.text-accent  { color: var(--amber); }
+.text-soft    { color: var(--ink-soft); }
+.text-muted   { color: var(--ink-muted); }
+.text-ink     { color: var(--ink); }
+.text-champagne { color: var(--champagne); }
+.bg-paper     { background: var(--canvas); }
+.bg-paper-deep{ background: var(--surface-1); }
+.bg-surface-2 { background: var(--surface-2); }
 
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
+/* ============================================================
+   Botões
+   ============================================================ */
 
-/* Card / modal - fundo grafite com borda fina */
-.surface-card {
-  background: #1E293B;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 1.5rem;
+/* CTA primário — âmbar sólido */
+.btn-ink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--amber);
+  color: #0E0F12;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+  padding: 0.75rem 1.25rem;
+  border-radius: 4px;
+  border: 1px solid var(--amber);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
-
-.surface-nav {
-  background: #0F172A;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+.btn-ink:hover {
+  background: var(--amber-deep);
+  border-color: var(--amber-deep);
+  transform: translateY(-1px);
 }
+.btn-ink:active { transform: translateY(0); }
+.btn-ink:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-/* Input padrão */
-.input-base {
-  background: #0F172A;
-  border: 1px solid rgb(51, 65, 85); /* slate-700 */
-  color: white;
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem;
+/* Secundário — surface com hairline */
+.btn-line {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.btn-line:hover { background: var(--surface-1); border-color: var(--rule-strong); }
+
+/* Link textual */
+.btn-link {
+  font-family: var(--font-body);
+  font-weight: 500;
   font-size: 0.875rem;
-  transition: all 0.2s;
-  outline: none;
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 2px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  background: transparent;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+}
+.btn-link:hover { color: var(--amber); border-color: var(--amber); }
+
+/* Ghost — apenas texto com hover suave */
+.btn-ghost-editorial {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  padding: 0.4rem 0.6rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.btn-ghost-editorial:hover { color: var(--ink); }
+
+/* WhatsApp — verde-oliva discreto */
+.btn-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--olive);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 4px;
+  border: 1px solid var(--olive);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-whatsapp:hover { background: #44552c; }
+
+/* ============================================================
+   Inputs
+   ============================================================ */
+
+.input-editorial {
   width: 100%;
+  background: var(--surface-1);
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  padding: 0.7rem 0.1rem;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.input-editorial::placeholder { color: var(--ink-muted); }
+.input-editorial:focus {
+  border-bottom-color: var(--amber);
+  background: var(--surface-2);
 }
 
-.input-base:focus {
-  border-color: rgb(59, 130, 246); /* blue-500 */
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+.input-editorial-serif {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  padding: 0.8rem 0.1rem;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  text-align: center;
+}
+.input-editorial-serif::placeholder { color: var(--ink-muted); }
+.input-editorial-serif:focus {
+  border-bottom-color: var(--amber);
+  box-shadow: 0 1px 0 0 var(--amber);
 }
 
-.input-base::placeholder {
-  color: rgba(255, 255, 255, 0.35);
-}
+/* ============================================================
+   Photo grid (cliente) — moldura fotográfica sem arredondamento
+   ============================================================ */
 
-.photo-card {
-  background: #1E293B;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s;
+.photo-cell {
+  background: var(--surface-1);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  overflow: hidden;
+  transition: border-color 0.2s ease, transform 0.2s ease;
   position: relative;
 }
-
-.photo-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(59, 130, 246, 0.5);
+.photo-cell:hover { border-color: var(--rule-strong); }
+.photo-cell.selected {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px var(--amber) inset;
 }
 
-.photo-card:hover .photo-image {
-  transform: scale(1.05);
+.photo-cell-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease, filter 0.2s ease;
+  background: var(--surface-2);
+}
+.photo-cell:hover .photo-cell-image { transform: scale(1.015); }
+
+.photo-cell-meta {
+  padding: 0.85rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  border-top: 1px solid var(--rule);
 }
 
-.photo-image {
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+.photo-cell-meta-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: 0.01em;
 }
 
-/* Botões — sistema sólido (sem gradiente) */
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-  border-radius: 0.75rem;
-  padding: 0.75rem 1.25rem;
-  transition: all 0.2s;
-  display: inline-flex;
+.photo-cell-meta-price {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.photo-cell-check {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  background: rgba(14, 15, 18, 0.6);
+  backdrop-filter: blur(8px);
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
   cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.photo-cell-check:hover { border-color: var(--amber); }
+.photo-cell-check.is-on {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #0E0F12;
 }
 
-.btn-primary:hover {
-  background: var(--accent-hover);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: #1E293B;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  color: #fff;
+.photo-cell-sold {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   font-weight: 600;
-  border-radius: 0.75rem;
-  padding: 0.75rem 1.25rem;
-  transition: all 0.2s;
-  display: inline-flex;
+  background: rgba(14, 15, 18, 0.85);
+  backdrop-filter: blur(8px);
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+}
+
+.photo-cell-badge {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  padding: 0.25rem 0.55rem;
+  font-family: var(--font-body);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  background: var(--surface-glass);
+  backdrop-filter: blur(8px);
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+}
+
+/* ============================================================
+   Modal — sheet escuro com hairline e blur no backdrop
+   ============================================================ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.modal-sheet {
+  background: var(--surface-1);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  max-width: 32rem;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-sheet-lg { max-width: 48rem; }
+.modal-sheet-xl { max-width: 64rem; }
+
+.modal-sheet-body { padding: 2rem; }
+
+/* ============================================================
+   Admin — dropzone
+   ============================================================ */
+
+.dropzone {
+  border: 1.5px dashed var(--ink-muted);
+  border-radius: 4px;
+  background: var(--surface-1);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.dropzone:hover { border-color: var(--amber); background: var(--surface-2); }
+
+.dropzone-label {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--ink);
+  margin-bottom: 0.25rem;
+}
+
+.dropzone-hint {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* ============================================================
+   Tabela editorial (admin)
+   ============================================================ */
+
+.editorial-table { width: 100%; border-collapse: collapse; }
+.editorial-table thead th {
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--ink-soft);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+.editorial-table tbody td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+.editorial-table tbody tr {
+  transition: background 0.15s ease;
   cursor: pointer;
 }
+.editorial-table tbody tr:hover { background: var(--surface-2); }
 
-.btn-secondary:hover {
-  background: #334155;
+/* ============================================================
+   Novos utilitários — Studio Dark Editorial
+   ============================================================ */
+
+/* Glass — header, dock, dropdowns */
+.glass {
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.glass-strong {
+  background: rgba(20, 22, 26, 0.85);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.btn-ghost {
+/* Badges — pílulas de status */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  line-height: 1;
+}
+.badge-amber {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.badge-champagne {
+  background: rgba(226, 217, 204, 0.1);
+  color: var(--champagne);
+  border-color: rgba(226, 217, 204, 0.25);
+}
+.badge-muted {
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  border-color: var(--rule);
+}
+.badge-active {
+  background: rgba(245, 158, 11, 0.18);
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+/* Dock de seleção (carrinho) — sticky bottom pill */
+.dock-selecao {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.6rem 0.6rem 1.25rem;
+  background: rgba(20, 22, 26, 0.92);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  max-width: calc(100vw - 2.5rem);
+}
+
+/* Cart pill âmbar — botão CTA do dock */
+.btn-amber-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--amber);
+  color: #0E0F12;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.7rem 1.3rem;
+  border-radius: 999px;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.btn-amber-pill:hover { background: var(--amber-deep); transform: translateY(-1px); }
+.btn-amber-pill:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* NavLink centralizada do header */
+.nav-link {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+  cursor: pointer;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
-  border-radius: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  transition: all 0.2s;
+  border: 0;
+}
+.nav-link:hover { color: var(--ink); background: var(--surface-2); }
+.nav-link.is-active { color: var(--amber); }
+
+/* Sidebar item (admin) */
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.65rem 0.9rem;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  width: 100%;
+}
+.sidebar-item:hover { background: var(--surface-2); color: var(--ink); }
+.sidebar-item.is-active {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+/* Cards auxiliares */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+/* QR Code box — branco pra contraste da câmera */
+.qr-box {
+  background: #FFFFFF;
+  padding: 1rem;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.875rem;
+  justify-content: center;
 }
 
-.btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+/* Animação sutil de entrada */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+.animate-fade-up { animation: fade-up 0.35s ease-out both; }
 
-.btn-danger {
-  background: #16a34a;
-  color: #fff;
-  font-weight: 600;
-  border-radius: 0.5rem;
-  padding: 0.5rem 1rem;
-  transition: all 0.2s;
-  font-size: 0.875rem;
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(0.85); }
 }
+.animate-pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
 
-.btn-danger:hover {
-  background: #15803d;
-}
+/* ============================================================
+   Scrollbar
+   ============================================================ */
 
-.btn-danger-soft {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
-  font-weight: 600;
-  border-radius: 0.5rem;
-  padding: 0.5rem 1rem;
-  transition: all 0.2s;
-  font-size: 0.875rem;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--canvas); }
+::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--rule-strong); }
 
-.btn-danger-soft:hover {
-  background: rgba(239, 68, 68, 0.3);
-}
-
-/* Pill/badge — chips arredondados sobre fundos escuros */
-.surface-pill {
-  background: #1E293B;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 9999px;
-}
-
-.surface-chip {
-  background: #1E293B;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 0.5rem;
-}
+/* Selection */
+::selection { background: var(--amber); color: #0E0F12; }

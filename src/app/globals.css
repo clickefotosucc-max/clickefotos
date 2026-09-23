@@ -1,10 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a1a;
+  --background: #0F172A;
   --foreground: #ffffff;
-  --accent: #8b5cf6;
-  --accent-2: #06b6d4;
+  --card: #1E293B;
+  --border: rgba(148, 163, 184, 0.2);
+  --accent: #2563EB;
+  --accent-hover: #1D4ED8;
 }
 
 @theme inline {
@@ -20,17 +22,14 @@
 }
 
 html, body {
-  background: #0a0a1a;
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   scroll-behavior: smooth;
 }
 
 body {
-  background-image:
-    radial-gradient(at 20% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
-    radial-gradient(at 80% 100%, rgba(6, 182, 212, 0.12) 0px, transparent 50%),
-    radial-gradient(at 50% 50%, rgba(236, 72, 153, 0.05) 0px, transparent 50%);
+  background: var(--background);
   background-attachment: fixed;
   min-height: 100vh;
 }
@@ -40,14 +39,14 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a1a;
+  background: #0F172A;
 }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #8b5cf6, #06b6d4);
+  background: #1E293B;
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #a78bfa, #22d3ee);
+  background: #334155;
 }
 
 @keyframes fadeUp {
@@ -59,11 +58,6 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
 }
 
 @keyframes float {
@@ -79,143 +73,158 @@ body {
   animation: float 6s ease-in-out infinite;
 }
 
-.gradient-text {
-  background: linear-gradient(135deg, #a78bfa 0%, #06b6d4 50%, #ec4899 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: shimmer 4s linear infinite;
+/* Card / modal - fundo grafite com borda fina */
+.surface-card {
+  background: #1E293B;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 1.5rem;
 }
 
-.glass {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.surface-nav {
+  background: #0F172A;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
 
-.glass-strong {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(30px) saturate(180%);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+/* Input padrão */
+.input-base {
+  background: #0F172A;
+  border: 1px solid rgb(51, 65, 85); /* slate-700 */
+  color: white;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  outline: none;
+  width: 100%;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  overflow: hidden;
+.input-base:focus {
+  border-color: rgb(59, 130, 246); /* blue-500 */
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
-.btn-primary::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, #a78bfa 0%, #22d3ee 100%);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.btn-primary:hover::before {
-  opacity: 1;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 40px rgba(139, 92, 246, 0.4);
-}
-
-.btn-primary:active {
-  transform: translateY(0);
-}
-
-.btn-primary > * {
-  position: relative;
-  z-index: 1;
+.input-base::placeholder {
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .photo-card {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  background: #1E293B;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s;
+  position: relative;
 }
 
 .photo-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 60px rgba(139, 92, 246, 0.3);
+  transform: translateY(-4px);
+  border-color: rgba(59, 130, 246, 0.5);
 }
 
 .photo-card:hover .photo-image {
-  transform: scale(1.08);
+  transform: scale(1.05);
 }
 
 .photo-image {
-  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.like-btn {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.like-btn:hover {
-  transform: scale(1.15);
-}
-
-.like-btn:active {
-  transform: scale(0.9);
-}
-
-.like-btn.liked {
-  animation: likeBurst 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes likeBurst {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.4); }
-  100% { transform: scale(1); }
-}
-
-input, select, textarea {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  color: #ffffff !important;
-  transition: all 0.2s;
-}
-
-input::placeholder, textarea::placeholder {
-  color: rgba(255, 255, 255, 0.4) !important;
-}
-
-input:focus, select:focus, textarea:focus {
-  outline: none;
-  border-color: rgba(139, 92, 246, 0.5) !important;
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1) !important;
-  background: rgba(255, 255, 255, 0.06) !important;
-}
-
-select option {
-  background: #1a1a2e;
-  color: #ffffff;
-}
-
-input[type="file"]::file-selector-button {
-  background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
+/* Botões — sistema sólido (sem gradiente) */
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
   font-weight: 600;
-  cursor: pointer;
-  margin-right: 1rem;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
 }
 
-input[type="file"]::file-selector-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+.btn-primary:hover {
+  background: var(--accent-hover);
 }
 
-::selection {
-  background: rgba(139, 92, 246, 0.3);
-  color: #ffffff;
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #1E293B;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #334155;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.btn-danger {
+  background: #16a34a;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s;
+  font-size: 0.875rem;
+}
+
+.btn-danger:hover {
+  background: #15803d;
+}
+
+.btn-danger-soft {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s;
+  font-size: 0.875rem;
+}
+
+.btn-danger-soft:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+/* Pill/badge — chips arredondados sobre fundos escuros */
+.surface-pill {
+  background: #1E293B;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+
+.surface-chip {
+  background: #1E293B;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 0.5rem;
 }

@@ -19,7 +19,8 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
   const [carrinho, setCarrinho] = useState<string[]>([]) // IDs das fotos no carrinho
   const [mostrarCarrinho, setMostrarCarrinho] = useState(false)
   const [comprando, setComprando] = useState(false)
-  const [step, setStep] = useState<'ver' | 'comprar' | 'pago' | 'baixar'>('ver')
+  const [step, setStep] = useState<'ver' | 'comprar' | 'pix' | 'pago' | 'baixar'>('ver')
+  const [fotoSelecionada, setFotoSelecionada] = useState<Foto | null>(null)
   const [email, setEmail] = useState('')
   const [nome, setNome] = useState('')
   const [pixCopiaCola, setPixCopiaCola] = useState('')
@@ -168,7 +169,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
 
   return (
     <div className="min-h-screen text-white">
-      <nav className="sticky top-0 z-50 glass border-b border-white/5">
+      <nav className="sticky top-0 z-50 surface-nav">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <button
             onClick={onVoltar}
@@ -190,7 +191,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
           >
             <ShoppingCart className="w-4 h-4" />
             {carrinho.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-violet-500 text-white text-xs flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">
                 {carrinho.length}
               </span>
             )}
@@ -200,12 +201,12 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
 
       <main className="max-w-7xl mx-auto px-6 py-12">
         <section className="text-center mb-12 animate-fade-up">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-xs font-medium mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full surface-card text-xs font-medium mb-4">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
             {fotos.length} {fotos.length === 1 ? 'foto' : 'fotos'} encontradas
           </div>
           <h1 className="text-4xl md:text-5xl font-black mb-3">
-            Olá, <span className="gradient-text">{pessoa.nome}</span>
+            Olá, <span className="text-blue-400">{pessoa.nome}</span>
           </h1>
           {pessoa.descricao && (
             <p className="text-white/60 max-w-xl mx-auto">{pessoa.descricao}</p>
@@ -213,7 +214,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
         </section>
 
         {fotos.length === 0 ? (
-          <div className="text-center py-24 glass-strong rounded-3xl">
+          <div className="text-center py-24 surface-card rounded-3xl">
             <div className="text-7xl mb-4 opacity-50">📷</div>
             <h3 className="text-xl font-semibold mb-2">Nenhuma foto ainda</h3>
             <p className="text-white/50">
@@ -227,10 +228,10 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
               return (
               <article
                 key={foto.id}
-                className={`photo-card glass-strong rounded-3xl overflow-hidden animate-fade-up transition-all ${noCarrinho ? 'ring-2 ring-violet-500' : ''}`}
+                className={`photo-card surface-card rounded-3xl overflow-hidden animate-fade-up transition-all ${noCarrinho ? 'ring-2 ring-blue-500' : ''}`}
                 style={{ animationDelay: `${idx * 0.05}s` }}
               >
-                <div className="relative aspect-[4/3] overflow-hidden bg-black/20 group cursor-pointer"
+                <div className="relative aspect-square overflow-hidden bg-slate-900 group cursor-pointer"
                   onClick={() => setFotoSelecionada(foto)}>
                   <img
                     src={foto.url}
@@ -250,12 +251,12 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                         e.stopPropagation()
                         toggleCarrinho(foto.id)
                       }}
-                      className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all ${noCarrinho ? 'bg-violet-500 text-white' : 'bg-black/40 text-white/70 hover:bg-black/60'}`}
+                      className={noCarrinho ? "absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all bg-blue-600 text-white" : "absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all bg-slate-800 text-white/70 hover:bg-slate-700"}
                     >
                       {noCarrinho ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                     </button>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 </div>
 
                 <div className="p-5">
@@ -268,14 +269,14 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                     </p>
                   )}
 
-                  <div className="mt-5 pt-4 border-t border-white/5">
+                  <div className="mt-5 pt-4 border-t border-slate-700/50">
                     {foto.vendida ? (
                       <button
                         onClick={() => {
                           setFotoSelecionada(foto)
                           setStep('baixar')
                         }}
-                        className="w-full py-2.5 rounded-xl glass hover:bg-white/[0.08] font-semibold text-sm flex items-center justify-center gap-2"
+                        className="w-full py-2.5 rounded-xl surface-card hover:bg-slate-800 font-semibold text-sm flex items-center justify-center gap-2"
                       >
                         <Download className="w-4 h-4" />
                         Baixar novamente
@@ -283,7 +284,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                     ) : noCarrinho ? (
                       <button
                         onClick={() => toggleCarrinho(foto.id)}
-                        className="w-full py-2.5 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 font-semibold text-sm flex items-center justify-center gap-2"
+                        className="w-full py-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold text-sm flex items-center justify-center gap-2"
                       >
                         <Check className="w-4 h-4" />
                         No carrinho • R$ {pessoa.preco_por_foto.toFixed(2).replace('.', ',')}
@@ -291,7 +292,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                     ) : (
                       <button
                         onClick={() => toggleCarrinho(foto.id)}
-                        className="w-full py-2.5 rounded-xl glass hover:bg-white/[0.08] font-semibold text-sm flex items-center justify-center gap-2"
+                        className="w-full py-2.5 rounded-xl surface-card hover:bg-slate-800 font-semibold text-sm flex items-center justify-center gap-2"
                       >
                         <Plus className="w-4 h-4" />
                         Adicionar ao carrinho
@@ -309,15 +310,15 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
       {/* Modal do Carrinho + Pagamento */}
       {mostrarCarrinho && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-up"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-up"
           onClick={() => {
-            if (step === 'pix') return // não fecha enquanto espera pagamento
+            if (step === 'pix') return
             setMostrarCarrinho(false)
             setStep('ver')
           }}
         >
           <div
-            className="glass-strong rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            className="surface-card rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
@@ -328,7 +329,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                       <ShoppingCart className="w-5 h-5" />
                       Seu carrinho
                     </h3>
-                    <button onClick={() => setMostrarCarrinho(false)} className="w-8 h-8 rounded-full glass flex items-center justify-center">
+                    <button onClick={() => setMostrarCarrinho(false)} className="w-8 h-8 rounded-full surface-card flex items-center justify-center hover:bg-slate-800">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -343,7 +344,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                     <>
                       <div className="space-y-3 mb-6">
                         {fotosNoCarrinho.map(foto => (
-                          <div key={foto.id} className="flex items-center gap-3 glass rounded-xl p-3">
+                          <div key={foto.id} className="flex items-center gap-3 surface-card rounded-xl p-3">
                             <img src={foto.url} className="w-16 h-16 rounded-lg object-cover" />
                             <div className="flex-1">
                               <div className="font-semibold text-sm">{foto.titulo}</div>
@@ -356,7 +357,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                         ))}
                       </div>
 
-                      <div className="border-t border-white/10 pt-4 mb-6">
+                      <div className="border-t border-slate-700/50 pt-4 mb-6">
                         <div className="flex justify-between items-center text-lg font-bold">
                           <span>Total</span>
                           <span>R$ {totalCarrinho.toFixed(2).replace('.', ',')}</span>
@@ -373,7 +374,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                             value={nome}
                             onChange={(e) => setNome(e.target.value)}
                             placeholder="Ex: João Silva"
-                            className="w-full px-4 py-3 rounded-xl"
+                            className="input-base"
                           />
                         </div>
                         <div>
@@ -385,7 +386,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="seu@email.com"
-                            className="w-full px-4 py-3 rounded-xl"
+                            className="input-base"
                           />
                           <p className="text-xs text-white/40 mt-2">Para receber o link de download</p>
                         </div>
@@ -393,7 +394,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                         <button
                           onClick={gerarPagamentoPix}
                           disabled={comprando || !email || !nome}
-                          className="btn-primary w-full py-4 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                          className="btn-primary w-full py-4 disabled:opacity-50"
                         >
                           <QrCode className="w-5 h-5" />
                           {comprando ? 'Gerando...' : `Pagar com PIX • R$ ${totalCarrinho.toFixed(2).replace('.', ',')}`}
@@ -414,7 +415,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                   </div>
 
                   <div className="text-center mb-4">
-                    <div className="text-3xl font-black gradient-text mb-1">
+                    <div className="text-3xl font-black text-blue-400 mb-1">
                       R$ {pixTotal.toFixed(2).replace('.', ',')}
                     </div>
                     <div className="text-sm text-white/60">{fotosNoCarrinho.length} {fotosNoCarrinho.length === 1 ? 'foto' : 'fotos'}</div>
@@ -428,7 +429,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                     Escaneie o QR Code com o app do seu banco
                   </p>
 
-                  <div className="glass rounded-xl p-3 mb-4">
+                  <div className="surface-card rounded-xl p-3 mb-4">
                     <label className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-2">
                       PIX Copia e Cola
                     </label>
@@ -442,7 +443,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                       />
                       <button
                         onClick={copiarPix}
-                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 transition-colors"
+                        className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors"
                       >
                         {copiado ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                       </button>
@@ -477,7 +478,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                     })()}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn-primary w-full py-4 rounded-xl font-semibold flex items-center justify-center gap-2 mb-3 bg-green-600 hover:bg-green-700"
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all w-full py-4 flex items-center justify-center gap-2 mb-3"
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
                     Enviar comprovante no WhatsApp
@@ -491,7 +492,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                       <button
                         onClick={confirmarPagamento}
                         disabled={comprando}
-                        className="w-full py-2.5 rounded-xl glass hover:bg-white/[0.08] font-semibold text-sm disabled:opacity-50"
+                        className="w-full py-2.5 rounded-xl surface-card hover:bg-slate-800 font-semibold text-sm disabled:opacity-50"
                       >
                         {comprando ? 'Liberando...' : 'Clique aqui pra liberar'}
                       </button>
@@ -510,7 +511,6 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                   >
                     Voltar
                   </button>
-                  </div>
                 </div>
               )}
 
@@ -526,7 +526,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
 
                   <div className="space-y-3 mb-6">
                     {fotos.filter(f => f.vendida).slice(-10).map(foto => (
-                      <div key={foto.id} className="flex items-center gap-3 glass rounded-xl p-3 text-left">
+                      <div key={foto.id} className="flex items-center gap-3 surface-card rounded-xl p-3 text-left">
                         <img src={foto.url} className="w-12 h-12 rounded-lg object-cover" />
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-sm truncate">{foto.titulo}</div>
@@ -537,7 +537,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                           download={`clickefotos-${foto.titulo}.jpg`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 transition-colors"
+                          className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors"
                         >
                           <Download className="w-4 h-4" />
                         </a>
@@ -550,7 +550,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                       setMostrarCarrinho(false)
                       setStep('ver')
                     }}
-                    className="w-full py-3 rounded-xl glass hover:bg-white/[0.08] font-semibold"
+                    className="w-full py-3 rounded-xl surface-card hover:bg-slate-800 font-semibold"
                   >
                     Fechar
                   </button>
@@ -564,14 +564,14 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
       {/* Modal de visualização de foto (sem compra) */}
       {fotoSelecionada && step !== 'pix' && step !== 'pago' && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-up"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-up"
           onClick={() => setFotoSelecionada(null)}
         >
           <div
-            className="glass-strong rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+            className="surface-card rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative bg-black/20 select-none">
+            <div className="relative bg-slate-900 select-none">
               <img
                 src={fotoSelecionada.url}
                 alt={fotoSelecionada.titulo}
@@ -581,7 +581,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
               />
               <button
                 onClick={() => setFotoSelecionada(null)}
-                className="absolute top-3 right-3 w-10 h-10 rounded-full glass-strong flex items-center justify-center hover:bg-white/[0.1]"
+                className="absolute top-3 right-3 w-10 h-10 rounded-full surface-card flex items-center justify-center hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -597,7 +597,7 @@ export default function AreaCliente({ pessoa, fotos: fotosIniciais, onVoltar }: 
                   download={`clickefotos-${fotoSelecionada.titulo}.jpg`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn-primary mt-4 w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+                  className="btn-primary mt-4 w-full py-3"
                 >
                   <Download className="w-4 h-4" />
                   Baixar HD

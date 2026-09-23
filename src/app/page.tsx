@@ -87,16 +87,13 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen text-white">
+    <div className="min-h-screen text-white bg-[#0F172A]">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 glass border-b border-white/5">
+      <nav className="sticky top-0 z-50 surface-nav">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-cyan-500 blur-md opacity-60"></div>
-              <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
-                <Camera className="w-5 h-5" />
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
+              <Camera className="w-5 h-5" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">Clickefotos</h1>
@@ -105,7 +102,7 @@ export default function Home() {
           </div>
           <button
             onClick={() => setView('admin')}
-            className="flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-xs font-medium hover:bg-white/[0.08] transition-all"
+            className="btn-ghost"
           >
             <Lock className="w-3.5 h-3.5" />
             Área do Organizador
@@ -115,13 +112,13 @@ export default function Home() {
 
       <main className="max-w-5xl mx-auto px-6 py-20">
         <section className="text-center mb-16 animate-fade-up">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-xs font-medium mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full surface-pill text-xs font-medium text-blue-400 mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
             FEIRA DE EMPREENDEDORISMO 2025
           </div>
           <h2 className="text-5xl md:text-7xl font-black tracking-tight mb-6">
             Suas fotos da feira, <br />
-            <span className="gradient-text">em um só lugar.</span>
+            <span className="text-blue-400">em um só lugar.</span>
           </h2>
           <p className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
             Digite o código que você recebeu na feira e veja todas as suas fotos.
@@ -131,9 +128,9 @@ export default function Home() {
 
         {view === 'admin' && !adminAutenticado ? (
           <section className="max-w-md mx-auto animate-fade-up">
-            <div className="glass-strong rounded-3xl p-8">
+            <div className="surface-card p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center">
                   <Lock className="w-6 h-6" />
                 </div>
                 <div>
@@ -148,7 +145,7 @@ export default function Home() {
                   value={senhaAdmin}
                   onChange={(e) => setSenhaAdmin(e.target.value)}
                   placeholder="Senha"
-                  className="w-full px-4 py-3 rounded-xl"
+                  className="input-base"
                   autoFocus
                 />
                 {erro && (
@@ -162,13 +159,13 @@ export default function Home() {
                       setErro('')
                       setSenhaAdmin('')
                     }}
-                    className="flex-1 py-3 rounded-xl glass hover:bg-white/[0.08] font-semibold transition-all"
+                    className="btn-secondary flex-1 py-3"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 btn-primary py-3 rounded-xl font-semibold"
+                    className="btn-primary flex-1 py-3"
                   >
                     Entrar
                   </button>
@@ -178,9 +175,9 @@ export default function Home() {
           </section>
         ) : (
           <section className="max-w-md mx-auto animate-fade-up" style={{ animationDelay: '0.2s' }}>
-            <div className="glass-strong rounded-3xl p-8">
+            <div className="surface-card p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-2xl">
+                <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-2xl">
                   🎫
                 </div>
                 <div>
@@ -199,7 +196,7 @@ export default function Home() {
                     value={codigo}
                     onChange={(e) => setCodigo(e.target.value.toUpperCase())}
                     placeholder="Ex: ABC-X9K"
-                    className="w-full px-4 py-4 rounded-xl text-center text-2xl font-mono font-bold tracking-widest"
+                    className="input-base text-center text-2xl font-mono font-bold tracking-widest"
                     maxLength={7}
                   />
                 </div>
@@ -213,7 +210,7 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={buscando}
-                  className="btn-primary w-full py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="btn-primary w-full py-4"
                 >
                   {buscando ? (
                     <>
@@ -229,7 +226,7 @@ export default function Home() {
                 </button>
               </form>
 
-              <div className="mt-6 pt-6 border-t border-white/5 text-center">
+              <div className="mt-6 pt-6 border-t border-slate-700/50 text-center">
                 <p className="text-xs text-white/40">
                   Não tem o código? Procure o organizador do evento.
                 </p>
@@ -244,7 +241,7 @@ export default function Home() {
             { num: '02', icon: '📸', title: 'Veja suas fotos', desc: 'Todas as suas fotos aparecem aqui' },
             { num: '03', icon: '⬇️', title: 'Baixe em HD', desc: 'Compre e leve em alta resolução' },
           ].map((step) => (
-            <div key={step.num} className="glass rounded-2xl p-6">
+            <div key={step.num} className="surface-card rounded-2xl p-6">
               <div className="flex items-start justify-between mb-4">
                 <span className="text-3xl">{step.icon}</span>
                 <span className="text-xs font-mono text-white/30">{step.num}</span>
@@ -256,9 +253,9 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-white/5 mt-12">
+      <footer className="border-t border-slate-700/50 mt-12">
         <div className="max-w-7xl mx-auto px-6 py-10 text-center text-sm text-white/40">
-          Feito com 💜 para a Feira de Empreendedorismo — {new Date().getFullYear()}
+          Feito para a Feira de Empreendedorismo — {new Date().getFullYear()}
         </div>
       </footer>
     </div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Foto, Pessoa } from '@/types'
 import { aplicarMarcaDagua } from '@/lib/watermark'
-import { gerarLinkWhatsApp } from '@/lib/whatsapp'
+import { gerarLinkWhatsApp, gerarLinkNotificacaoFotos } from '@/lib/whatsapp'
 import Header from '@/components/Header'
 import {
   Plus, Upload, Copy, Check, Trash2, Clock, X, Settings, FolderUp,
@@ -30,6 +30,7 @@ export default function AreaAdmin({ onVoltar }: Props) {
   const [novoTurma, setNovoTurma] = useState('')
   const [novoDescricao, setNovoDescricao] = useState('')
   const [novoPreco, setNovoPreco] = useState('5,00')
+  const [novoTelefone, setNovoTelefone] = useState('')
   const [criando, setCriando] = useState(false)
 
   const [titulo, setTitulo] = useState('')
@@ -152,12 +153,13 @@ export default function AreaAdmin({ onVoltar }: Props) {
       codigo, nome: novoNome,
       turma: novoTurma || null, descricao: novoDescricao || null,
       preco_por_foto: precoParaNumero(novoPreco),
+      telefone: novoTelefone || null,
     }])
     setCriando(false)
     if (error) { alert('Erro ao criar pessoa: ' + error.message); return }
 
     setShowNovaPessoa(false)
-    setNovoNome(''); setNovoTurma(''); setNovoDescricao(''); setNovoPreco('5,00')
+    setNovoNome(''); setNovoTurma(''); setNovoDescricao(''); setNovoPreco('5,00'); setNovoTelefone('')
     await carregarPessoas()
   }
 
@@ -391,6 +393,18 @@ export default function AreaAdmin({ onVoltar }: Props) {
                   placeholder="Ex: Participante da feira"
                   className="input-editorial"
                 />
+              </FormField>
+              <FormField label="Telefone (opcional)" htmlFor="novo-telefone">
+                <input
+                  id="novo-telefone"
+                  type="tel"
+                  inputMode="tel"
+                  value={novoTelefone}
+                  onChange={(e) => setNovoTelefone(e.target.value)}
+                  placeholder="(11) 99999-9999"
+                  className="input-editorial"
+                />
+                <p className="text-xs text-ink-soft mt-2">Usado para enviar o link de resgate pelo WhatsApp.</p>
               </FormField>
               <FormField label="Preço por foto (R$)" htmlFor="novo-preco">
                 <input
@@ -862,24 +876,31 @@ export default function AreaAdmin({ onVoltar }: Props) {
 
             <SidebarCard titulo="Notificar Participante" eyebrow="WHATSAPP & EMAIL">
               <div className="space-y-2">
-                <a
-                  href={gerarLinkWhatsApp({
-                    nome: pessoaSelecionada.nome,
-                    email: '',
-                    pessoa: pessoaSelecionada.nome,
-                    codigo: pessoaSelecionada.codigo,
-                    quantidade: fotosPessoa.length,
-                    valor: 0,
-                    pixCopiaCola: '',
-                    whatsappDestino: whatsapp || '5511999999999',
-                  })}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-whatsapp w-full !justify-center"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  Enviar WhatsApp
-                </a>
+                {pessoaSelecionada.telefone ? (
+                  <a
+                    href={gerarLinkNotificacaoFotos({
+                      nome: pessoaSelecionada.nome,
+                      codigo: pessoaSelecionada.codigo,
+                      urlBase: typeof window !== 'undefined' ? window.location.origin : '',
+                      telefone: pessoaSelecionada.telefone,
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-whatsapp w-full !justify-center"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    Notificar por WhatsApp
+                  </a>
+                ) : (
+                  <button
+                    disabled
+                    title="Cadastre o telefone do participante para enviar a notificação"
+                    className="btn-whatsapp w-full !justify-center opacity-50 cursor-not-allowed"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    Notificar por WhatsApp
+                  </button>
+                )}
                 <button className="btn-line w-full !justify-center text-sm">
                   <Mail className="w-3.5 h-3.5" />
                   Enviar E-mail

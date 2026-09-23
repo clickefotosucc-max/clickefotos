@@ -26,3 +26,23 @@ Aguardo a confirmação para baixar as fotos em HD. Obrigado!`
   const numero = dados.whatsappDestino.replace(/\D/g, '')
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`
 }
+
+export function gerarLinkNotificacaoFotos(params: {
+  nome: string
+  codigo: string
+  urlBase: string
+  telefone: string
+}): string {
+  let numero = params.telefone.replace(/\D/g, '')
+  if (numero.length <= 11) numero = '55' + numero
+
+  const urlResgate = `${params.urlBase}/?codigo=${params.codigo}`
+
+  const primeiroNome = params.nome.split(' ')[0] || params.nome
+  const mensagem =
+    `Olá, ${primeiroNome}! Suas fotos já estão disponíveis no ClickeFotos.\n\n` +
+    `Acesse pelo link: ${urlResgate}\n\n` +
+    `Digite seu código ${params.codigo} para visualizar.`
+
+  return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`
+}

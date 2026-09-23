@@ -30,8 +30,12 @@ CREATE TABLE public.pessoas (
   descricao TEXT,
   turma TEXT,
   preco_por_foto DECIMAL(10,2) DEFAULT 5.00,
+  telefone TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Para bancos já existentes (aplicar manualmente no SQL Editor do Supabase):
+-- ALTER TABLE public.pessoas ADD COLUMN IF NOT EXISTS telefone TEXT;
 
 -- ============================================
 -- 2. Tabela de fotos (ligadas à pessoa)

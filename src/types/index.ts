@@ -5,6 +5,7 @@ export interface Pessoa {
   descricao: string | null
   turma: string | null
   preco_por_foto: number
+  telefone: string | null
   created_at: string
 }
 

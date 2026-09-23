@@ -36,13 +36,11 @@ export function gerarLinkNotificacaoFotos(params: {
   let numero = params.telefone.replace(/\D/g, '')
   if (numero.length <= 11) numero = '55' + numero
 
-  const urlResgate = `${params.urlBase}/?codigo=${params.codigo}`
-
   const primeiroNome = params.nome.split(' ')[0] || params.nome
   const mensagem =
     `Olá, ${primeiroNome}! Suas fotos já estão disponíveis no ClickeFotos.\n\n` +
-    `Acesse pelo link: ${urlResgate}\n\n` +
-    `Digite seu código ${params.codigo} para visualizar.`
+    `Acesse: ${params.urlBase}\n\n` +
+    `Digite seu código *${params.codigo}* para visualizar.`
 
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`
 }
